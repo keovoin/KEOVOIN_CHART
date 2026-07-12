@@ -32,9 +32,9 @@
   function login() {
     var token = $('tokenInput').value.trim();
     if (!token) return msg($('loginMsg'), 'Enter the admin token.', 'err');
-    api('/api/admin/login', { method: 'POST', body: JSON.stringify({ token: token }) }).then(function (r) {
+    api('/api/admin/login', { method: 'POST', headers: { 'X-Admin-Token': token }, body: JSON.stringify({ token: token }) }).then(function (r) {
       if (r.status === 200) { setToken(token); $('tokenInput').value = ''; showAdmin(); }
-      else msg($('loginMsg'), r.body.error || 'Sign-in failed.', 'err');
+      else msg($('loginMsg'), (r.body.error || 'Sign-in failed.') + ' (HTTP ' + r.status + ')', 'err');
     }).catch(function () { msg($('loginMsg'), 'Cannot reach the server — make sure you are on the app\u2019s Vercel URL (not github.io) and the backend is running.', 'err'); });
   }
 

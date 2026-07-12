@@ -113,7 +113,9 @@
         series: [{
           type: 'pie', radius: ['52%', '74%'], center: ['50%', '44%'], avoidLabelOverlap: true,
           itemStyle: { borderColor: c.surface, borderWidth: 3, borderRadius: 6 },
-          label: { show: false }, emphasis: { scale: true, scaleSize: 6, label: { show: true, formatter: '{d}%', fontSize: 16, fontWeight: 700, color: c.text } },
+          label: { show: labelsOn(), formatter: '{d}%', fontSize: 11, fontWeight: 600, color: c.text2 },
+          labelLine: { show: labelsOn(), length: 8, length2: 8 },
+          emphasis: { scale: true, scaleSize: 6, label: { show: true, formatter: '{b}\n{d}%', fontSize: 15, fontWeight: 700, color: c.text } },
           data: data, animationType: 'scale', animationDuration: anim ? 800 : 0
         }]
       };
@@ -257,7 +259,7 @@
         series: [{
           type: 'treemap', roam: false, nodeClick: false, breadcrumb: { show: false }, width: '100%', height: '100%', top: 6, left: 0, right: 0, bottom: 6,
           itemStyle: { borderColor: c.surface, borderWidth: 3, gapWidth: 3, borderRadius: 6 },
-          label: { show: true, formatter: '{b}', color: '#fff', fontSize: 12, fontWeight: 600 },
+          label: { show: true, formatter: function (p) { return labelsOn() ? (p.name + '\n' + fmt(p.value, spec.sub)) : p.name; }, color: '#fff', fontSize: 12, fontWeight: 600 },
           color: pal, data: data, animationDuration: anim ? 800 : 0
         }]
       };
