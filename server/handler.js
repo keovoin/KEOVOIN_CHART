@@ -54,6 +54,46 @@ function saveConfig(cfg) {
 }
 let config = loadConfig();
 
+/* ----------------------------- team dashboards store -----------------------------
+   Persistence, in priority order:
+     1. Vercel KV / Upstash Redis REST (KV_REST_API_URL + KV_REST_API_TOKEN) —
+        works on serverless (Vercel) where the filesystem is read-only
+     2. Local JSON file (persistent hosts: Render / Fly / self-hosted)
+     3. In-memory (last resort; resets on restart)
+   -------------------------------------------------------------------------------- */
+const DASH_PATH = path.join(__dirname, 'dashboards.json');
+const KV_URL = process.env.KV_REST_API_URL || process.env.VIS_KV_URL || '';
+const KV_TOKEN = process.env.KV_REST_API_TOKEN || process.env.VIS_KV_TOKEN || '';
+const KV_ON = !!(KV_URL && KV_TOKEN);
+let dashMem = [];
+
+function dashMode() { return KV_ON ? 'kv' : (PERSISTENT ? 'file' : 'memory'); }
+
+function kvReq(method, keypath, body) {
+  return new Promise(function (resolve, reject) {
+    var u; try { u = new URL(KV_URL.replace(/\/+$/, '') + keypath); } catch (e) { return reject(e); }
+    var lib = u.protocol === 'http:' ? http : https;
+    var data = body != null ? (typeof body === 'string' ? body : JSON.stringify(body)) : null;
+    var opts = { method: method, hostname: u.hostname, port: u.port || (u.protocol === 'http:' ? 80 : 443), path: u.pathname + u.search, headers: { 'Authorization': 'Bearer ' + KV_TOKEN }, timeout: 10000 };
+    if (data) { opts.headers['Content-Type'] = 'text/plain'; opts.headers['Content-Length'] = Buffer.byteLength(data); }
+    var r = lib.request(opts, function (pr) { var d = ''; pr.on('data', function (c) { d += c; }); pr.on('end', function () { try { resolve(JSON.parse(d || '{}')); } catch (e) { resolve({}); } }); });
+    r.on('timeout', function () { r.destroy(); reject(new Error('KV timeout')); });
+    r.on('error', reject);
+    if (data) r.write(data); r.end();
+  });
+}
+function dashList() {
+  if (KV_ON) return kvReq('GET', '/get/vis:dashboards').then(function (res) { var v = res && res.result; return v ? (typeof v === 'string' ? JSON.parse(v) : v) : []; }).catch(function () { return []; });
+  if (PERSISTENT) { try { return Promise.resolve(JSON.parse(fs.readFileSync(DASH_PATH, 'utf8'))); } catch (e) { return Promise.resolve([]); } }
+  return Promise.resolve(dashMem);
+}
+function dashPersist(list) {
+  list = list.slice(0, 100);
+  if (KV_ON) return kvReq('POST', '/set/vis:dashboards', JSON.stringify(list)).then(function () { return true; }).catch(function () { return false; });
+  if (PERSISTENT) { try { fs.writeFileSync(DASH_PATH, JSON.stringify(list)); return Promise.resolve(true); } catch (e) { return Promise.resolve(false); } }
+  dashMem = list; return Promise.resolve(true);
+}
+
 /* ----------------------------- sessions ----------------------------- */
 const sessions = new Map();
 const SESSION_TTL = 1000 * 60 * 60 * 8;
@@ -165,6 +205,40 @@ async function handleRequest(req, res) {
       if (pathname === '/api/health' && req.method === 'GET') return sendJSON(res, 200, { ok: true, uptime: process.uptime(), persistent: PERSISTENT });
       if (pathname === '/api/config' && req.method === 'GET') return sendJSON(res, 200, publicConfig());
       if (pathname === '/api/ai/proxy' && req.method === 'POST') { const body = await readBody(req); return aiProxy(req, res, body); }
+
+      // ----- shared team dashboards -----
+      if (pathname === '/api/dashboards' && req.method === 'GET') {
+        const items = await dashList();
+        return sendJSON(res, 200, { ok: true, items: items, storage: dashMode() });
+      }
+      if (pathname === '/api/dashboards' && req.method === 'POST') {
+        const body = await readBody(req) || {};
+        if (!body.title || !body.dataText) return sendJSON(res, 400, { error: 'title and dataText are required' });
+        const list = await dashList();
+        const entry = {
+          id: 'd' + Date.now().toString(36) + Math.random().toString(36).slice(2, 6),
+          title: String(body.title).slice(0, 120),
+          dataText: String(body.dataText).slice(0, 200000),
+          theme: (body.theme || '').slice(0, 40),
+          format: (body.format || '').slice(0, 12),
+          rows: body.rows | 0, cols: body.cols | 0,
+          kpis: Array.isArray(body.kpis) ? body.kpis.slice(0, 4) : [],
+          author: (body.author || 'Team').slice(0, 60),
+          createdAt: Date.now()
+        };
+        // de-dupe identical title+data
+        const deduped = list.filter(function (e) { return !(e.title === entry.title && e.dataText === entry.dataText); });
+        deduped.unshift(entry);
+        const saved = await dashPersist(deduped);
+        return sendJSON(res, 200, { ok: true, id: entry.id, persisted: saved, storage: dashMode() });
+      }
+      if (pathname === '/api/dashboards' && req.method === 'DELETE') {
+        const id = parsed.searchParams.get('id');
+        let list = await dashList();
+        list = list.filter(function (e) { return e.id !== id; });
+        await dashPersist(list);
+        return sendJSON(res, 200, { ok: true });
+      }
 
       if (pathname === '/api/admin/login' && req.method === 'POST') {
         const body = await readBody(req) || {};

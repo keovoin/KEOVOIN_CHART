@@ -130,6 +130,22 @@
 'Build,4,10\n' +
 'QA,9,12\n' +
 'Launch,12,13'
+    },
+
+    risk: {
+      title: 'Risk Register',
+      icon: 'alert',
+      color: '#dc2626',
+      desc: 'Probability vs impact risk matrix.',
+      tags: ['Risk Matrix', 'RAID'],
+      data:
+'Risk,Probability,Impact\n' +
+'Data breach,7,9\n' +
+'Vendor delay,5,6\n' +
+'Budget overrun,6,7\n' +
+'Key attrition,4,8\n' +
+'Scope creep,8,5\n' +
+'Compliance gap,3,9'
     }
   };
 

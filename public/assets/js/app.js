@@ -36,7 +36,11 @@
   /* ---------- routing ---------- */
   function route(name) {
     document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('active', v.getAttribute('data-view') === name); });
-    document.querySelectorAll('.nav-item').forEach(function (n) { n.classList.toggle('active', n.getAttribute('data-route') === name); });
+    document.querySelectorAll('.nav-item').forEach(function (n) {
+      var on = n.getAttribute('data-route') === name;
+      n.classList.toggle('active', on);
+      if (on) n.setAttribute('aria-current', 'page'); else n.removeAttribute('aria-current');
+    });
     var titles = { home: 'Home', studio: 'Studio', dashboard: 'Dashboard', infographic: 'Infographic', presentation: 'Presentation', templates: 'Templates', workspace: 'Workspace', history: 'History', settings: 'Settings' };
     document.getElementById('topbarTitle').textContent = titles[name] || 'VIS';
     closeSidebar();
@@ -45,7 +49,10 @@
     else if (name === 'presentation') buildPresentation();
     else if (name === 'infographic') buildInfographic();
     else if (name === 'history') VIS.history.renderInto(document.getElementById('historyList'), 'list');
-    else if (name === 'workspace') VIS.history.renderInto(document.getElementById('workspaceGrid'), 'gallery');
+    else if (name === 'workspace') {
+      if (VIS.team && VIS.team.isAvailable()) VIS.team.renderInto(document.getElementById('workspaceGrid'));
+      else VIS.history.renderInto(document.getElementById('workspaceGrid'), 'gallery');
+    }
     window.scrollTo({ top: 0 });
   }
 
@@ -453,6 +460,28 @@
     document.getElementById('dataInput').value = e.dataText;
     generate(e.dataText, e.title);
   }
+  function openTeamDashboard(id) {
+    var e = VIS.team.get(id);
+    if (!e) { toast('Entry not found'); return; }
+    if (e.theme) applyTheme(e.theme);
+    document.getElementById('dataInput').value = e.dataText;
+    generate(e.dataText, e.title);
+  }
+  function saveToTeam() {
+    if (!state.analysis) { toast('Generate a dashboard first'); return; }
+    var a = state.analysis;
+    toast('Saving to team…');
+    VIS.team.save({
+      title: document.getElementById('dashTitle').value || a.title || 'Untitled',
+      dataText: state.lastText,
+      theme: document.documentElement.getAttribute('data-theme'),
+      format: a.meta.format, rows: a.meta.rows, cols: a.meta.cols,
+      kpis: a.kpis.slice(0, 4).map(function (k) { return { label: k.label, formatted: k.formatted }; })
+    }).then(function (r) {
+      if (r && r.ok) toast(r.persisted === false ? 'Saved to team (in-memory — add a store for persistence)' : 'Saved to team workspace');
+      else toast((r && r.error) || 'Could not save to team');
+    }).catch(function () { toast('Could not reach the server'); });
+  }
   function refreshHistoryViews() {
     if (document.querySelector('[data-view="history"]').classList.contains('active')) VIS.history.renderInto(document.getElementById('historyList'), 'list');
     if (document.querySelector('[data-view="workspace"]').classList.contains('active')) VIS.history.renderInto(document.getElementById('workspaceGrid'), 'gallery');
@@ -547,6 +576,11 @@
       if (hOpen) { openHistory(hOpen.getAttribute('data-hist-open')); return; }
       var hDel = e.target.closest('[data-hist-del]');
       if (hDel) { VIS.history.remove(hDel.getAttribute('data-hist-del')); refreshHistoryViews(); return; }
+      // team (shared) dashboards
+      var tOpen = e.target.closest('[data-team-open]');
+      if (tOpen) { openTeamDashboard(tOpen.getAttribute('data-team-open')); return; }
+      var tDel = e.target.closest('[data-team-del]');
+      if (tDel) { VIS.team.remove(tDel.getAttribute('data-team-del')).then(function () { VIS.team.renderInto(document.getElementById('workspaceGrid')); }); return; }
 
       // close export dropdown when clicking outside
       if (!e.target.closest('.export-menu')) document.getElementById('exportDrop').classList.remove('open');
@@ -567,6 +601,8 @@
     // present + infographic actions
     var presentBtn = document.getElementById('presentBtn');
     if (presentBtn) presentBtn.addEventListener('click', function () { route('presentation'); });
+    var saveTeamBtn = document.getElementById('saveTeamBtn');
+    if (saveTeamBtn) saveTeamBtn.addEventListener('click', saveToTeam);
     var presExport = document.getElementById('presExport');
     if (presExport) presExport.addEventListener('click', function () { VIS.present.exportPDF(); });
     var presRebuild = document.getElementById('presRebuild');
@@ -635,6 +671,12 @@
       applyBranding(info.branding, prefs);
       injectAISettings();
     }).catch(function () { injectAISettings(); });
+
+    // Detect the shared team dashboard store; reveal "Save to team" when available.
+    if (VIS.team) VIS.team.init().then(function (ok) {
+      var btn = document.getElementById('saveTeamBtn');
+      if (btn) btn.style.display = ok ? '' : 'none';
+    });
   }
 
   /* ---------- team branding (from backend) ---------- */
