@@ -34,8 +34,10 @@ jobs:
       - name: Upload site
         uses: actions/upload-pages-artifact@v3
         with:
-          # Upload the whole repository root (static site)
-          path: '.'
+          # Publishes the static frontend only (from public/).
+          # This is the "static/demo" mode — the AI admin portal and server-side
+          # key management require the Node backend (see README: Team deployment).
+          path: './public'
 
       - name: Deploy to GitHub Pages
         id: deployment

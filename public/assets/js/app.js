@@ -420,6 +420,23 @@
   function injectAISettings() {
     var grid = document.querySelector('[data-view="settings"] .settings-grid');
     if (!grid) return;
+
+    // Team/backend mode: credentials are managed centrally by an admin.
+    if (VIS.ai.backendPresent && VIS.ai.backendPresent()) {
+      var on = VIS.ai.backendAvailable();
+      var tcard = document.createElement('div');
+      tcard.className = 'setting-card';
+      tcard.innerHTML =
+        '<h3>AI Provider <span class="card-badge" style="margin-left:6px">Team</span></h3>' +
+        '<p class="about" style="margin-bottom:12px">AI is managed centrally for your team. The API key is stored securely on the server and is never exposed in the browser.</p>' +
+        '<div class="setting-row"><label>Status</label><span class="status-chip ' + (on ? 'on' : 'off') + '">' + (on ? 'Active' : 'Not configured') + '</span></div>' +
+        '<div class="setting-row" style="justify-content:flex-end"><a class="btn btn-ghost btn-sm" href="admin.html"><span data-ic="settings"></span>Open admin portal</a></div>';
+      grid.appendChild(tcard);
+      VIS.hydrateIcons(tcard);
+      return;
+    }
+
+    // Static/browser mode: user can store their own key locally.
     var cfg = VIS.ai.getConfig();
     var card = document.createElement('div');
     card.className = 'setting-card';
@@ -556,12 +573,31 @@
     }
 
     renderTemplates();
-    injectAISettings();
     VIS.hydrateIcons(document);
     wire();
     updateDetect();
     if (VIS.chat) VIS.chat.init();
     route('home');
+
+    // Detect the team backend, then apply central branding + AI settings card.
+    VIS.ai.init().then(function (info) {
+      applyBranding(info.branding, prefs);
+      injectAISettings();
+    }).catch(function () { injectAISettings(); });
+  }
+
+  /* ---------- team branding (from backend) ---------- */
+  function applyBranding(branding, prefs) {
+    if (!branding) return;
+    if (branding.title) {
+      document.title = branding.title;
+      var bn = document.querySelector('.brand-name');
+      // keep the short "VIS" mark, but update document title + tooltip
+      if (bn) bn.setAttribute('title', branding.title);
+    }
+    // Apply team defaults only when the user hasn't chosen their own.
+    if (!prefs.theme && branding.defaultTheme) applyTheme(branding.defaultTheme);
+    if (!prefs.mode && branding.defaultMode) applyMode(branding.defaultMode);
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);

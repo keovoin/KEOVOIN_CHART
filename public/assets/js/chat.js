@@ -170,7 +170,7 @@
     return ({ 'executive-white': 'Executive White', 'executive-dark': 'Executive Dark' })[key] || key.charAt(0).toUpperCase() + key.slice(1);
   }
 
-  /* ---------- free-form question via configured model ---------- */
+  /* ---------- free-form question via configured model (backend or browser) ---------- */
   function askModel(question, analysis) {
     var ctx = [];
     ctx.push('DATASET: ' + (analysis.title || 'data') + ' (' + analysis.meta.rows + ' rows).');
@@ -180,26 +180,12 @@
     });
     if (analysis.categories.length) ctx.push('Segments: ' + analysis.categories[0].values.slice(0, 12).join(', '));
 
-    var cfg = VIS.ai.getConfig();
-    var url = cfg.endpoint;
-    if (!/\/(chat\/completions|completions|responses)\b/.test(url)) url = url.replace(/\/+$/, '') + '/v1/chat/completions';
-    var headers = { 'Content-Type': 'application/json' };
-    if (cfg.apiKey) headers['Authorization'] = 'Bearer ' + cfg.apiKey;
-
-    var body = {
-      model: cfg.model || 'gpt-4o-mini',
-      messages: [
-        { role: 'system', content: 'You are a concise executive data analyst. Answer in 1-3 short sentences using ONLY the provided figures. No markdown.' },
-        { role: 'user', content: 'Data context:\n' + ctx.join('\n') + '\n\nQuestion: ' + question }
-      ],
-      temperature: 0.3, max_tokens: 300
-    };
-    var controller = new AbortController();
-    var timer = setTimeout(function () { controller.abort(); }, 30000);
-    return fetch(url, { method: 'POST', headers: headers, body: JSON.stringify(body), signal: controller.signal })
-      .then(function (r) { clearTimeout(timer); if (!r.ok) throw new Error('HTTP ' + r.status); return r.json(); })
-      .then(function (d) { var c = d && d.choices && d.choices[0] && (d.choices[0].message ? d.choices[0].message.content : d.choices[0].text); return c ? String(c).trim() : null; })
-      .catch(function (e) { clearTimeout(timer); console.warn('[VIS chat]', e.message); return null; });
+    var messages = [
+      { role: 'system', content: 'You are a concise executive data analyst. Answer in 1-3 short sentences using ONLY the provided figures. No markdown.' },
+      { role: 'user', content: 'Data context:\n' + ctx.join('\n') + '\n\nQuestion: ' + question }
+    ];
+    return VIS.ai.complete(messages, { temperature: 0.3, max_tokens: 300 })
+      .then(function (c) { return c ? String(c).trim() : null; });
   }
 
   window.VIS.chat = { init: ensurePanel, toggle: toggle };

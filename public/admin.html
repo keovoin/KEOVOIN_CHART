@@ -1,0 +1,112 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="executive-white" data-mode="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIS · Admin Portal</title>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="assets/css/app.css" />
+  <style>
+    body { background: var(--bg-grad), var(--bg); background-attachment: fixed; }
+    .admin-wrap { max-width: 720px; margin: 0 auto; padding: 40px 24px 80px; }
+    .admin-brand { display: flex; align-items: center; gap: 12px; margin-bottom: 28px; }
+    .admin-brand .brand-mark { width: 42px; height: 42px; }
+    .admin-brand h1 { font-size: 20px; font-weight: 800; letter-spacing: -.02em; }
+    .admin-brand .sub { font-size: 12px; color: var(--text-3); }
+    .panel { background: var(--card); border: 1px solid var(--card-border); border-radius: var(--radius); padding: 26px; box-shadow: var(--card-shadow); backdrop-filter: blur(var(--blur)); margin-bottom: 18px; }
+    .panel h2 { font-size: 16px; margin-bottom: 4px; }
+    .panel .desc { font-size: 13px; color: var(--text-2); margin-bottom: 18px; }
+    .field { margin-bottom: 16px; }
+    .field label { display: block; font-size: 13px; font-weight: 600; color: var(--text-2); margin-bottom: 6px; }
+    .field input, .field select { width: 100%; }
+    .row2 { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+    .switch-row { display: flex; align-items: center; justify-content: space-between; padding: 10px 0; }
+    .actions { display: flex; gap: 10px; justify-content: flex-end; margin-top: 6px; flex-wrap: wrap; }
+    .login-card { max-width: 400px; margin: 8vh auto 0; }
+    .status-pill { display: inline-flex; align-items: center; gap: 7px; font-size: 12.5px; font-weight: 600; padding: 5px 12px; border-radius: 999px; }
+    .status-pill .dot { width: 8px; height: 8px; border-radius: 50%; }
+    .status-pill.on { color: var(--pos); background: color-mix(in srgb, var(--pos) 12%, transparent); } .status-pill.on .dot { background: var(--pos); }
+    .status-pill.off { color: var(--text-3); background: var(--surface-2); } .status-pill.off .dot { background: var(--text-3); }
+    .hidden { display: none !important; }
+    .note { font-size: 12px; color: var(--text-3); margin-top: 8px; line-height: 1.5; }
+    .topline { display: flex; align-items: center; justify-content: space-between; margin-bottom: 18px; }
+    .msg { font-size: 13px; font-weight: 600; padding: 10px 14px; border-radius: 12px; margin-bottom: 16px; display: none; }
+    .msg.ok { display: block; color: var(--pos); background: color-mix(in srgb, var(--pos) 12%, transparent); }
+    .msg.err { display: block; color: var(--neg); background: color-mix(in srgb, var(--neg) 12%, transparent); }
+  </style>
+</head>
+<body>
+  <div class="admin-wrap">
+    <div class="admin-brand">
+      <div class="brand-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 3v18h18" /><path d="M7 15l3-4 3 2 4-6" /></svg>
+      </div>
+      <div><h1>VIS Admin Portal</h1><div class="sub">Manage AI credentials &amp; team defaults</div></div>
+    </div>
+
+    <!-- Login -->
+    <div id="loginView">
+      <div class="panel login-card">
+        <h2>Sign in</h2>
+        <p class="desc">Enter the admin token to manage settings.</p>
+        <div id="loginMsg" class="msg"></div>
+        <div class="field"><label for="tokenInput">Admin token</label><input id="tokenInput" class="input" type="password" placeholder="admin token" autocomplete="current-password" /></div>
+        <div class="actions"><button class="btn btn-primary" id="loginBtn">Sign in</button></div>
+        <div class="note">The default token is <code>vis-admin</code> unless overridden by the <code>VIS_ADMIN_TOKEN</code> environment variable. Change it below after signing in.</div>
+      </div>
+    </div>
+
+    <!-- Admin -->
+    <div id="adminView" class="hidden">
+      <div class="topline">
+        <a class="btn btn-ghost btn-sm" href="index.html"><span>← Back to app</span></a>
+        <button class="btn btn-ghost btn-sm" id="logoutBtn">Sign out</button>
+      </div>
+      <div id="adminMsg" class="msg"></div>
+
+      <!-- AI Provider -->
+      <div class="panel">
+        <div class="switch-row" style="padding-top:0">
+          <div><h2>AI Provider</h2><p class="desc" style="margin-bottom:0">The API key is stored on the server and never sent to teammates' browsers.</p></div>
+          <span id="aiStatus" class="status-pill off"><span class="dot"></span>Disabled</span>
+        </div>
+        <div class="switch-row"><label for="aiEnabled" style="font-weight:600;font-size:13.5px">Enable AI enhancement for the team</label><input id="aiEnabled" type="checkbox" /></div>
+        <div class="field"><label for="aiEndpoint">Endpoint URL</label><input id="aiEndpoint" class="input" placeholder="https://your-host/v1/chat/completions" /></div>
+        <div class="row2">
+          <div class="field"><label for="aiModel">Model</label><input id="aiModel" class="input" placeholder="gpt-4o-mini" /></div>
+          <div class="field"><label for="aiKey">API key</label><input id="aiKey" class="input" type="password" placeholder="leave blank to keep current" /></div>
+        </div>
+        <div class="note" id="keyNote"></div>
+        <div class="actions">
+          <button class="btn btn-ghost btn-sm" id="clearKeyBtn">Clear key</button>
+          <button class="btn btn-ghost btn-sm" id="testBtn">Test connection</button>
+          <button class="btn btn-primary btn-sm" id="saveAiBtn">Save AI settings</button>
+        </div>
+      </div>
+
+      <!-- Branding / defaults -->
+      <div class="panel">
+        <h2>Team defaults &amp; branding</h2>
+        <p class="desc">Applied to everyone by default (each person can still switch locally).</p>
+        <div class="field"><label for="brTitle">App title</label><input id="brTitle" class="input" placeholder="VIS · Visual Intelligence Studio" /></div>
+        <div class="row2">
+          <div class="field"><label for="brTheme">Default theme</label><select id="brTheme" class="select"></select></div>
+          <div class="field"><label for="brMode">Default mode</label><select id="brMode" class="select"><option value="light">Light</option><option value="dark">Dark</option></select></div>
+        </div>
+        <div class="actions"><button class="btn btn-primary btn-sm" id="saveBrandBtn">Save defaults</button></div>
+      </div>
+
+      <!-- Security -->
+      <div class="panel">
+        <h2>Security</h2>
+        <p class="desc">Change the admin token used to access this portal.</p>
+        <div class="field"><label for="newToken">New admin token</label><input id="newToken" class="input" type="password" placeholder="leave blank to keep current" /></div>
+        <div class="note" id="tokenNote"></div>
+        <div class="actions"><button class="btn btn-primary btn-sm" id="saveTokenBtn">Update token</button></div>
+      </div>
+    </div>
+  </div>
+
+  <script src="assets/js/admin.js"></script>
+</body>
+</html>
