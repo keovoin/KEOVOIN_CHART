@@ -25,7 +25,7 @@ const CONFIG_PATH = path.join(__dirname, 'config.json');
 const EXAMPLE_PATH = path.join(__dirname, 'config.example.json');
 
 // Build marker — lets you confirm which version a deployment is actually serving.
-const BUILD = 'v12 · 2026-07-12';
+const BUILD = 'v13 · 2026-07-12';
 
 // Serverless platforms (e.g. Vercel) have a read-only filesystem.
 let PERSISTENT = !process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME;
@@ -279,10 +279,13 @@ async function handleRequest(req, res) {
       }
 
       if (pathname === '/api/admin/login' && req.method === 'POST') {
-        const body = await readBody(req) || {};
-        const given = String(body.token == null ? '' : body.token).trim();
+        // Read the token from a header first (always delivered, even if the
+        // serverless platform doesn't hand us the request body); fall back to body.
+        var given = headerAdminToken(req);
+        if (!given) { const body = await readBody(req) || {}; given = String(body.token == null ? '' : body.token).trim(); }
         const expected = String(config.adminToken == null ? '' : config.adminToken).trim();
-        if (!given || given !== expected) return sendJSON(res, 401, { error: 'Invalid admin token' });
+        if (!given) return sendJSON(res, 400, { error: 'No token received by the server' });
+        if (given !== expected) return sendJSON(res, 401, { error: 'Invalid admin token' });
         return sendJSON(res, 200, { ok: true }, { 'Set-Cookie': `vis_admin=${makeToken()}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL / 1000}` });
       }
       if (pathname === '/api/admin/logout' && req.method === 'POST') {
