@@ -14,7 +14,7 @@
   ];
 
   var state = { analysis: null, lastText: '' };
-  VIS.settings = { maxKpi: 5, sigma: 2, anim: true };
+  VIS.settings = { maxKpi: 5, sigma: 2, anim: true, labels: true };
 
   /* ---------- prefs ---------- */
   function loadPrefs() {
@@ -633,6 +633,8 @@
     if (mk) mk.addEventListener('change', function () { VIS.settings.maxKpi = clamp(+this.value, 2, 8); persistSettings(); });
     if (sg) sg.addEventListener('change', function () { VIS.settings.sigma = clamp(+this.value, 1, 4); persistSettings(); });
     if (an) an.addEventListener('change', function () { VIS.settings.anim = this.checked; persistSettings(); });
+    var lb = document.getElementById('setLabels');
+    if (lb) lb.addEventListener('change', function () { VIS.settings.labels = this.checked; persistSettings(); refreshActiveDataView(); });
 
     // keyboard: Cmd/Ctrl+Enter to generate from studio
     document.getElementById('dataInput').addEventListener('keydown', function (e) {
