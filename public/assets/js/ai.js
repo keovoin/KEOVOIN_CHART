@@ -61,8 +61,10 @@
     // browser mode — direct to provider with the locally stored key
     var cfg = getConfig();
     if (!cfg.enabled || !cfg.endpoint) return Promise.resolve(null);
-    var url = cfg.endpoint;
-    if (!/\/(chat\/completions|completions|responses)\b/.test(url)) url = url.replace(/\/+$/, '') + '/v1/chat/completions';
+    var url = String(cfg.endpoint || '').trim();
+    if (/\/(chat\/completions|completions|responses)\b/.test(url)) { /* full path */ }
+    else if (/\/v\d+\/?$/.test(url)) url = url.replace(/\/+$/, '') + '/chat/completions';
+    else url = url.replace(/\/+$/, '') + '/v1/chat/completions';
     var headers = { 'Content-Type': 'application/json' };
     if (cfg.apiKey) headers['Authorization'] = 'Bearer ' + cfg.apiKey;
     body.model = opts.model || cfg.model || 'gpt-4o-mini';

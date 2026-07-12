@@ -23,7 +23,7 @@
     if (tok) opts.headers['X-Admin-Token'] = tok; // cookie-independent auth (robust on serverless)
     return fetch(path, opts).then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }).catch(function () { return { status: r.status, body: {} }; }); });
   }
-  function msg(el, text, kind) { el.textContent = text; el.className = 'msg ' + (kind || 'ok'); if (text) setTimeout(function () { if (el.textContent === text) el.className = 'msg'; }, 4000); }
+  function msg(el, text, kind) { el.textContent = text; el.className = 'msg ' + (kind || 'ok'); if (text && (kind || 'ok') === 'ok') setTimeout(function () { if (el.textContent === text) el.className = 'msg'; }, 4000); }
 
   function showAdmin() { $('loginView').classList.add('hidden'); $('adminView').classList.remove('hidden'); loadConfig(); }
   function showLogin() { $('adminView').classList.add('hidden'); $('loginView').classList.remove('hidden'); }
@@ -89,8 +89,16 @@
       $('aiKey').value = '';
       return api('/api/ai/proxy', { method: 'POST', body: JSON.stringify({ messages: [{ role: 'user', content: 'Reply with the single word OK.' }], max_tokens: 5 }) });
     }).then(function (r) {
-      if (r.status === 200 && r.body && r.body.choices) msg($('adminMsg'), 'Connection OK — the model responded.');
-      else msg($('adminMsg'), (r.body && r.body.error) || 'Connection failed (HTTP ' + r.status + ').', 'err');
+      console.log('[VIS Test connection] HTTP', r.status, r.body);
+      if (r.status === 200 && r.body && r.body.choices && r.body.choices.length) {
+        var ch = r.body.choices[0]; var txt = ch && (ch.message ? ch.message.content : ch.text);
+        msg($('adminMsg'), 'Connection OK — model replied: "' + String(txt || '').trim().slice(0, 48) + '"');
+      } else if (r.body && r.body.error) {
+        var e = r.body.error;
+        msg($('adminMsg'), 'AI error: ' + (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 240), 'err');
+      } else {
+        msg($('adminMsg'), 'Reached the provider (HTTP ' + r.status + ') but the reply was not in chat-completions format. Raw: ' + JSON.stringify(r.body).slice(0, 240), 'err');
+      }
       loadConfig();
     });
   }

@@ -25,7 +25,7 @@ const CONFIG_PATH = path.join(__dirname, 'config.json');
 const EXAMPLE_PATH = path.join(__dirname, 'config.example.json');
 
 // Build marker — lets you confirm which version a deployment is actually serving.
-const BUILD = 'v14 · 2026-07-12';
+const BUILD = 'v15 · 2026-07-12';
 
 // Serverless platforms (e.g. Vercel) have a read-only filesystem.
 let PERSISTENT = !process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME;
@@ -182,8 +182,14 @@ function aiProxy(req, res, body) {
   }
   if (!body || !Array.isArray(body.messages)) return sendJSON(res, 400, { error: 'messages[] required' });
 
-  let endpoint = config.ai.endpoint;
-  if (!/\/(chat\/completions|completions|responses)\b/.test(endpoint)) endpoint = endpoint.replace(/\/+$/, '') + '/v1/chat/completions';
+  let endpoint = String(config.ai.endpoint || '').trim();
+  if (/\/(chat\/completions|completions|responses)\b/.test(endpoint)) {
+    // full path already provided — use as-is
+  } else if (/\/v\d+\/?$/.test(endpoint)) {
+    endpoint = endpoint.replace(/\/+$/, '') + '/chat/completions';   // ".../v1" -> avoid double /v1
+  } else {
+    endpoint = endpoint.replace(/\/+$/, '') + '/v1/chat/completions';
+  }
   let target;
   try { target = new URL(endpoint); } catch (e) { return sendJSON(res, 500, { error: 'Invalid endpoint configured' }); }
 
