@@ -1,0 +1,223 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="executive-white" data-mode="light">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>VIS · Visual Intelligence Studio</title>
+  <meta name="description" content="Turn pasted business data into beautiful executive dashboards, insights and presentations." />
+
+  <!-- Fonts -->
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
+
+  <!-- Styles -->
+  <link rel="stylesheet" href="assets/css/app.css" />
+
+  <!-- Libraries (loaded in the user's browser via CDN) -->
+  <script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+</head>
+<body>
+  <!-- ======================= APP SHELL ======================= -->
+  <div id="app">
+    <!-- Sidebar -->
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark" aria-hidden="true">
+          <svg viewBox="0 0 24 24" width="22" height="22" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M3 3v18h18" />
+            <path d="M7 15l3-4 3 2 4-6" />
+          </svg>
+        </div>
+        <div class="brand-text">
+          <span class="brand-name">VIS</span>
+          <span class="brand-sub">Visual Intelligence</span>
+        </div>
+      </div>
+
+      <nav class="nav" aria-label="Primary">
+        <button class="nav-item active" data-route="home"><span class="nav-ic" data-ic="home"></span>Home</button>
+        <button class="nav-item" data-route="studio"><span class="nav-ic" data-ic="studio"></span>Studio</button>
+        <button class="nav-item" data-route="dashboard"><span class="nav-ic" data-ic="dashboard"></span>Dashboard</button>
+        <button class="nav-item" data-route="templates"><span class="nav-ic" data-ic="templates"></span>Templates</button>
+        <button class="nav-item" data-route="settings"><span class="nav-ic" data-ic="settings"></span>Settings</button>
+      </nav>
+
+      <div class="sidebar-foot">
+        <div class="hint-card">
+          <div class="hint-title">Tip</div>
+          <div class="hint-body">Paste a spreadsheet, CSV, JSON or markdown table — VIS builds the dashboard automatically.</div>
+        </div>
+      </div>
+    </aside>
+
+    <!-- Main -->
+    <main class="main">
+      <!-- Top bar -->
+      <header class="topbar">
+        <button class="icon-btn only-mobile" id="menuToggle" aria-label="Toggle menu"><span data-ic="menu"></span></button>
+        <div class="topbar-title" id="topbarTitle">Home</div>
+        <div class="topbar-actions">
+          <div class="theme-picker">
+            <label for="themeSelect" class="sr-only">Theme</label>
+            <select id="themeSelect" class="select" title="Visual theme"></select>
+          </div>
+          <button class="icon-btn" id="modeToggle" title="Toggle light / dark" aria-label="Toggle light / dark"><span data-ic="moon"></span></button>
+        </div>
+      </header>
+
+      <!-- Routed views -->
+      <div class="view-wrap">
+
+        <!-- ============ HOME ============ -->
+        <section class="view active" data-view="home">
+          <div class="hero">
+            <div class="hero-badge">Visual Intelligence Studio · v1</div>
+            <h1 class="hero-title">Turn raw data into <span class="grad">executive dashboards</span> in seconds.</h1>
+            <p class="hero-sub">Paste a spreadsheet, CSV, JSON or a markdown table. VIS understands the schema, picks the right charts, finds the story, and builds a presentation-ready dashboard — automatically.</p>
+            <div class="hero-cta">
+              <button class="btn btn-primary" data-route="studio"><span data-ic="spark"></span>Open Studio</button>
+              <button class="btn btn-ghost" data-action="load-sample" data-sample="executive"><span data-ic="play"></span>Try a sample</button>
+            </div>
+          </div>
+
+          <div class="feature-grid">
+            <div class="feature-card"><div class="feature-ic" data-ic="brain"></div><h3>AI data understanding</h3><p>Detects dates, categories, currency, percentages and relationships — no configuration.</p></div>
+            <div class="feature-card"><div class="feature-ic" data-ic="chart"></div><h3>Automatic charts</h3><p>Chooses line, bar, donut, scatter, radar, gauge and more based on the data shape.</p></div>
+            <div class="feature-card"><div class="feature-ic" data-ic="layout"></div><h3>Auto layout</h3><p>Composes a responsive Bento grid with KPI heroes, trends and insights.</p></div>
+            <div class="feature-card"><div class="feature-ic" data-ic="insight"></div><h3>Executive insight</h3><p>Generates a summary, key findings, risks and recommendations.</p></div>
+            <div class="feature-card"><div class="feature-ic" data-ic="palette"></div><h3>Premium themes</h3><p>Apple, Stripe, Linear, Finance, Glass and more — light &amp; dark.</p></div>
+            <div class="feature-card"><div class="feature-ic" data-ic="export"></div><h3>One-click export</h3><p>PNG, PDF and JSON. Print straight to a polished report.</p></div>
+          </div>
+
+          <div class="home-templates">
+            <div class="section-head"><h2>Start from a DNA template</h2><p>Prebuilt executive layouts with sample data.</p></div>
+            <div class="template-row" id="homeTemplates"></div>
+          </div>
+        </section>
+
+        <!-- ============ STUDIO ============ -->
+        <section class="view" data-view="studio">
+          <div class="studio">
+            <div class="studio-head">
+              <h2>Studio</h2>
+              <p>Paste your data below. VIS auto-detects the format — CSV, tab-separated (copied from Excel/Sheets), JSON, or a markdown table.</p>
+            </div>
+
+            <div class="studio-toolbar">
+              <div class="seg" id="sampleSeg">
+                <span class="seg-label">Samples:</span>
+                <button class="chip" data-action="load-sample" data-sample="executive">Executive</button>
+                <button class="chip" data-action="load-sample" data-sample="finance">Finance</button>
+                <button class="chip" data-action="load-sample" data-sample="sales">Sales</button>
+                <button class="chip" data-action="load-sample" data-sample="hr">HR</button>
+                <button class="chip" data-action="load-sample" data-sample="pmo">PMO</button>
+              </div>
+              <div class="studio-toolbar-right">
+                <button class="btn btn-ghost btn-sm" id="clearBtn"><span data-ic="trash"></span>Clear</button>
+              </div>
+            </div>
+
+            <div class="paste-wrap">
+              <textarea id="dataInput" class="paste-area" spellcheck="false" placeholder="Paste data here…
+
+Example:
+Month, Revenue, Expenses, Customers
+Jan, 42000, 31000, 120
+Feb, 51000, 33000, 148
+Mar, 60000, 35000, 171
+Apr, 58000, 36000, 180
+May, 72000, 38000, 205
+Jun, 81000, 40000, 240"></textarea>
+              <div class="paste-foot">
+                <div class="detect" id="detectHint">No data yet</div>
+                <button class="btn btn-primary" id="generateBtn"><span data-ic="spark"></span>Generate dashboard</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ DASHBOARD ============ -->
+        <section class="view" data-view="dashboard">
+          <div class="dash-toolbar">
+            <div class="dash-title-block">
+              <input id="dashTitle" class="dash-title-input" value="Executive Dashboard" aria-label="Dashboard title" />
+              <div class="dash-meta" id="dashMeta">—</div>
+            </div>
+            <div class="dash-actions">
+              <button class="btn btn-ghost btn-sm" data-route="studio"><span data-ic="edit"></span>Edit data</button>
+              <button class="btn btn-ghost btn-sm" id="regenBtn"><span data-ic="refresh"></span>Regenerate</button>
+              <div class="export-menu">
+                <button class="btn btn-primary btn-sm" id="exportBtn"><span data-ic="export"></span>Export</button>
+                <div class="export-drop" id="exportDrop">
+                  <button data-export="png"><span data-ic="image"></span>PNG image</button>
+                  <button data-export="pdf"><span data-ic="pdf"></span>PDF report</button>
+                  <button data-export="print"><span data-ic="print"></span>Print</button>
+                  <button data-export="json"><span data-ic="code"></span>JSON data</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div id="dashboard" class="dashboard">
+            <div class="empty-state" id="dashEmpty">
+              <div class="empty-ic" data-ic="dashboard"></div>
+              <h3>No dashboard yet</h3>
+              <p>Head to the Studio, paste some data and hit <strong>Generate</strong>.</p>
+              <button class="btn btn-primary" data-route="studio"><span data-ic="spark"></span>Open Studio</button>
+            </div>
+          </div>
+        </section>
+
+        <!-- ============ TEMPLATES ============ -->
+        <section class="view" data-view="templates">
+          <div class="section-head"><h2>Templates</h2><p>Executive DNA blueprints. Pick one to load its sample data and layout.</p></div>
+          <div class="template-grid" id="templateGrid"></div>
+        </section>
+
+        <!-- ============ SETTINGS ============ -->
+        <section class="view" data-view="settings">
+          <div class="section-head"><h2>Settings</h2><p>Appearance and engine preferences. Stored locally in your browser.</p></div>
+          <div class="settings-grid">
+            <div class="setting-card">
+              <h3>Appearance</h3>
+              <div class="setting-row"><label>Theme</label><select id="themeSelect2" class="select"></select></div>
+              <div class="setting-row"><label>Color mode</label>
+                <div class="toggle-group" id="modeGroup">
+                  <button data-mode="light" class="active">Light</button>
+                  <button data-mode="dark">Dark</button>
+                </div>
+              </div>
+            </div>
+            <div class="setting-card">
+              <h3>Engine</h3>
+              <div class="setting-row"><label>Max KPI cards</label><input id="setMaxKpi" class="input" type="number" min="2" max="8" value="5" /></div>
+              <div class="setting-row"><label>Anomaly sensitivity (σ)</label><input id="setSigma" class="input" type="number" min="1" max="4" step="0.5" value="2" /></div>
+              <div class="setting-row toggle-row"><label>Animate charts</label><input id="setAnim" type="checkbox" checked /></div>
+            </div>
+            <div class="setting-card">
+              <h3>About VIS</h3>
+              <p class="about">Visual Intelligence Studio transforms pasted business data into executive dashboards. The analysis engine runs entirely in your browser — no data leaves your machine. It can be connected to an LLM for richer narratives.</p>
+            </div>
+          </div>
+        </section>
+
+      </div>
+    </main>
+  </div>
+
+  <!-- Toast -->
+  <div id="toast" class="toast" role="status" aria-live="polite"></div>
+
+  <!-- Scripts (classic, ordered — works on file:// and static hosting) -->
+  <script src="assets/js/icons.js"></script>
+  <script src="assets/js/samples.js"></script>
+  <script src="assets/js/engine.js"></script>
+  <script src="assets/js/charts.js"></script>
+  <script src="assets/js/render.js"></script>
+  <script src="assets/js/ai.js"></script>
+  <script src="assets/js/app.js"></script>
+</body>
+</html>
