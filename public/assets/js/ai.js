@@ -29,9 +29,10 @@
           backend.available = !!(j.ai && j.ai.available);
           backend.model = (j.ai && j.ai.model) || '';
           backend.branding = j.branding || null;
+          backend.build = j.build || '';
           backend.present = true;
         }
-        return { backendPresent: !!backend.present, aiAvailable: backend.available, branding: backend.branding };
+        return { backendPresent: !!backend.present, aiAvailable: backend.available, branding: backend.branding, build: backend.build };
       })
       .catch(function () { backend.checked = true; return { backendPresent: false, aiAvailable: false, branding: null }; });
   }

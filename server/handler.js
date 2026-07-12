@@ -24,6 +24,9 @@ const PUBLIC_DIR = path.join(ROOT, 'public');
 const CONFIG_PATH = path.join(__dirname, 'config.json');
 const EXAMPLE_PATH = path.join(__dirname, 'config.example.json');
 
+// Build marker — lets you confirm which version a deployment is actually serving.
+const BUILD = 'v12 · 2026-07-12';
+
 // Serverless platforms (e.g. Vercel) have a read-only filesystem.
 let PERSISTENT = !process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME;
 
@@ -159,6 +162,7 @@ function maskKey(k) { if (!k) return ''; if (k.length <= 8) return '••••
 function publicConfig() {
   return {
     ok: true,
+    build: BUILD,
     ai: { available: !!(config.ai.enabled && config.ai.endpoint && config.ai.apiKey), model: config.ai.model || '' },
     branding: config.branding
   };
@@ -236,7 +240,7 @@ async function handleRequest(req, res) {
 
   if (pathname.startsWith('/api/')) {
     try {
-      if (pathname === '/api/health' && req.method === 'GET') return sendJSON(res, 200, { ok: true, uptime: process.uptime(), persistent: PERSISTENT });
+      if (pathname === '/api/health' && req.method === 'GET') return sendJSON(res, 200, { ok: true, build: BUILD, uptime: process.uptime(), persistent: PERSISTENT, aiConfigured: !!(config.ai.enabled && config.ai.endpoint && config.ai.apiKey), kv: KV_ON });
       if (pathname === '/api/config' && req.method === 'GET') return sendJSON(res, 200, publicConfig());
       if (pathname === '/api/ai/proxy' && req.method === 'POST') { const body = await readBody(req); return aiProxy(req, res, body); }
 

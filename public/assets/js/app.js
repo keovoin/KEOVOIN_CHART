@@ -696,7 +696,10 @@
     VIS.ai.init().then(function (info) {
       applyBranding(info.branding, prefs);
       injectAISettings();
-    }).catch(function () { injectAISettings(); });
+      var bt = document.getElementById('buildTag');
+      if (bt) bt.textContent = info.build ? ('Build ' + info.build) : 'Static preview · no backend';
+      console.log('%cVIS ' + (info.build ? 'Build ' + info.build : 'static (no backend detected)'), 'color:#0071e3;font-weight:700');
+    }).catch(function () { injectAISettings(); var bt = document.getElementById('buildTag'); if (bt) bt.textContent = 'Static preview · no backend'; });
 
     // Detect the shared team dashboard store; reveal "Save to team" when available.
     if (VIS.team) VIS.team.init().then(function (ok) {

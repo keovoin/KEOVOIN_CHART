@@ -817,3 +817,7 @@ table.data td.num { text-align:right; font-variant-numeric: tabular-nums; }
 .s-kpi-ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 12px;
   color: var(--accent); background: var(--accent-soft); }
 .s-kpi-ic [data-ic] { width: 22px; height: 22px; }
+
+
+/* Build marker in the sidebar footer */
+.build-tag { margin-top: 10px; font-size: 10.5px; color: var(--text-3); text-align: center; letter-spacing: .02em; }
