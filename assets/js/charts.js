@@ -156,6 +156,80 @@
           data: [{ value: spec.value }], animationDuration: anim ? 1200 : 0
         }]
       };
+    },
+
+    stacked: function (spec, c, pal, anim) {
+      return {
+        color: pal, grid: baseGrid(), tooltip: Object.assign(tooltip(c), { axisPointer: { type: 'shadow' } }),
+        legend: { top: 0, right: 0, textStyle: { color: c.text2, fontSize: 11 }, icon: 'roundRect', itemWidth: 10, itemHeight: 10 },
+        xAxis: { type: 'category', data: spec.x, axisLine: { lineStyle: { color: c.line } }, axisTick: { show: false }, axisLabel: Object.assign({ interval: 0, rotate: spec.x.length > 6 ? 30 : 0 }, axisLabel(c)) },
+        yAxis: { type: 'value', splitLine: splitLine(c), axisLabel: Object.assign({ formatter: function (v) { return fmt(v); } }, axisLabel(c)) },
+        series: spec.series.map(function (s, i) {
+          return { name: s.name, type: 'bar', stack: 'total', data: s.data, barMaxWidth: 46, itemStyle: { borderRadius: i === spec.series.length - 1 ? [6, 6, 0, 0] : 0, color: pal[i % pal.length] }, emphasis: { focus: 'series' }, animationDuration: anim ? 800 : 0 };
+        })
+      };
+    },
+
+    waterfall: function (spec, c, pal, anim) {
+      // spec.x labels, spec.values deltas; builds an invisible base + colored bars
+      var running = 0, base = [], vals = [], colors = [];
+      spec.values.forEach(function (v) {
+        if (v >= 0) { base.push(running); vals.push(v); colors.push(pal[1] || c.accent2); }
+        else { base.push(running + v); vals.push(-v); colors.push(cssVar('--neg', '#dc2626')); }
+        running += v;
+      });
+      // final total bar
+      var x = spec.x.concat(['Total']);
+      base.push(0); vals.push(running); colors.push(c.accent);
+      return {
+        grid: baseGrid(), tooltip: Object.assign(tooltip(c), { axisPointer: { type: 'shadow' }, formatter: function (p) { var i = p[1].dataIndex; return x[i] + ': <b>' + fmt(i < spec.values.length ? spec.values[i] : running, spec.sub) + '</b>'; } }),
+        xAxis: { type: 'category', data: x, axisLine: { lineStyle: { color: c.line } }, axisTick: { show: false }, axisLabel: Object.assign({ interval: 0, rotate: x.length > 6 ? 30 : 0 }, axisLabel(c)) },
+        yAxis: { type: 'value', splitLine: splitLine(c), axisLabel: Object.assign({ formatter: function (v) { return fmt(v, spec.sub); } }, axisLabel(c)) },
+        series: [
+          { type: 'bar', stack: 'w', itemStyle: { color: 'transparent' }, data: base, silent: true },
+          { type: 'bar', stack: 'w', barMaxWidth: 44, data: vals.map(function (v, i) { return { value: v, itemStyle: { color: colors[i], borderRadius: 4 } }; }), animationDuration: anim ? 800 : 0 }
+        ]
+      };
+    },
+
+    treemap: function (spec, c, pal, anim) {
+      var data = spec.labels.map(function (l, i) { return { name: l, value: Math.abs(spec.data[i]) || 0 }; });
+      return {
+        tooltip: { backgroundColor: c.surface, borderColor: c.line, borderWidth: 1, textStyle: { color: c.text, fontSize: 12 }, extraCssText: 'border-radius:12px;padding:10px 12px;', formatter: function (p) { return p.name + ': <b>' + fmt(p.value, spec.sub) + '</b>'; } },
+        series: [{
+          type: 'treemap', roam: false, nodeClick: false, breadcrumb: { show: false }, width: '100%', height: '100%', top: 6, left: 0, right: 0, bottom: 6,
+          itemStyle: { borderColor: c.surface, borderWidth: 3, gapWidth: 3, borderRadius: 6 },
+          label: { show: true, formatter: '{b}', color: '#fff', fontSize: 12, fontWeight: 600 },
+          color: pal, data: data, animationDuration: anim ? 800 : 0
+        }]
+      };
+    },
+
+    heatmap: function (spec, c, pal, anim) {
+      // spec.xLabels, spec.yLabels, spec.points [[xIdx,yIdx,value]]
+      var vals = spec.points.map(function (p) { return p[2]; });
+      var maxV = vals.length ? Math.max.apply(null, vals) : 1;
+      var minV = vals.length ? Math.min.apply(null, vals) : 0;
+      return {
+        grid: { left: 8, right: 8, top: 8, bottom: 60, containLabel: true },
+        tooltip: { backgroundColor: c.surface, borderColor: c.line, borderWidth: 1, textStyle: { color: c.text, fontSize: 12 }, extraCssText: 'border-radius:12px;padding:10px 12px;', formatter: function (p) { return spec.yLabels[p.data[1]] + ' · ' + spec.xLabels[p.data[0]] + ': <b>' + fmt(p.data[2], spec.sub) + '</b>'; } },
+        xAxis: { type: 'category', data: spec.xLabels, splitArea: { show: true }, axisLine: { lineStyle: { color: c.line } }, axisTick: { show: false }, axisLabel: Object.assign({ rotate: spec.xLabels.length > 6 ? 30 : 0 }, axisLabel(c)) },
+        yAxis: { type: 'category', data: spec.yLabels, splitArea: { show: true }, axisLine: { lineStyle: { color: c.line } }, axisTick: { show: false }, axisLabel: axisLabel(c) },
+        visualMap: { min: minV, max: maxV, calculable: true, orient: 'horizontal', left: 'center', bottom: 0, textStyle: { color: c.text3, fontSize: 10 }, inRange: { color: [cssVar('--surface-2', '#f1f5f9'), pal[0]] } },
+        series: [{ type: 'heatmap', data: spec.points, label: { show: false }, itemStyle: { borderColor: c.surface, borderWidth: 2, borderRadius: 4 }, animationDuration: anim ? 700 : 0 }]
+      };
+    },
+
+    bubble: function (spec, c, pal, anim) {
+      var sizes = spec.points.map(function (p) { return p[2]; });
+      var maxS = sizes.length ? Math.max.apply(null, sizes) : 1;
+      return {
+        color: pal, grid: baseGrid(),
+        tooltip: { trigger: 'item', backgroundColor: c.surface, borderColor: c.line, borderWidth: 1, textStyle: { color: c.text, fontSize: 12 }, extraCssText: 'border-radius:12px;padding:10px 12px;', formatter: function (p) { return (p.data[3] || '') + '<br/>' + spec.xName + ': <b>' + fmt(p.data[0]) + '</b><br/>' + spec.yName + ': <b>' + fmt(p.data[1]) + '</b><br/>' + spec.sizeName + ': <b>' + fmt(p.data[2]) + '</b>'; } },
+        xAxis: { type: 'value', name: spec.xName, nameTextStyle: { color: c.text3, fontSize: 11 }, splitLine: splitLine(c), axisLabel: axisLabel(c) },
+        yAxis: { type: 'value', name: spec.yName, nameTextStyle: { color: c.text3, fontSize: 11 }, splitLine: splitLine(c), axisLabel: axisLabel(c) },
+        series: [{ type: 'scatter', symbolSize: function (d) { return 12 + (d[2] / maxS) * 44; }, data: spec.points, itemStyle: { color: pal[0], opacity: 0.6, borderColor: '#fff', borderWidth: 1 }, animationDuration: anim ? 800 : 0 }]
+      };
     }
   };
 

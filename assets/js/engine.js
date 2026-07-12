@@ -340,8 +340,8 @@
       });
     }
 
-    // 4. Relationship — scatter when 2+ independent measures & enough rows
-    if (measures.length >= 2 && rows.length >= 5 && !dateCol) {
+    // 4. Relationship — scatter for exactly two independent measures
+    if (measures.length === 2 && rows.length >= 5 && !dateCol) {
       charts.push({
         kind: 'scatter',
         title: measures[0].name + ' vs ' + measures[1].name,
@@ -365,7 +365,62 @@
       });
     }
 
-    return charts;
+    // 6. Stacked composition over time — additive measures across periods
+    if (dateCol) {
+      var additive = measures.filter(function (m) { return m.sub !== 'percent' && !/(total|nps|score|rate|margin)/i.test(m.name); });
+      if (additive.length >= 2 && additive.length <= 5 && rows.length <= 16) {
+        charts.push({
+          kind: 'stacked',
+          title: 'Composition over time',
+          role: 'stacked', size: 'col-6', icon: 'chart',
+          x: dateCol.values.map(String),
+          series: additive.slice(0, 5).map(function (m) { return { name: m.name, data: m.nums, sub: m.sub }; })
+        });
+      }
+    }
+
+    // 7. Waterfall — period-over-period change for a finance-like measure
+    if (dateCol && measures.length && rows.length >= 3 && rows.length <= 14) {
+      var flowM = measures.find(function (m) { return /(profit|net|cash|flow|revenue|balance)/i.test(m.name) && m.sub !== 'percent'; });
+      if (flowM) {
+        var deltas = [];
+        for (var wi = 1; wi < flowM.nums.length; wi++) deltas.push(round(flowM.nums[wi] - flowM.nums[wi - 1], 2));
+        if (deltas.length >= 2) {
+          charts.push({
+            kind: 'waterfall',
+            title: flowM.name + ' — period changes',
+            role: 'waterfall', size: 'col-6', icon: 'trendUp',
+            x: dateCol.values.slice(1).map(String),
+            values: deltas, sub: flowM.sub
+          });
+        }
+      }
+    }
+
+    // 8. Treemap — many categories, hierarchical share (alt to donut)
+    if (!dateCol && categories.length && measures.length && rows.length > 6) {
+      charts.push({
+        kind: 'treemap',
+        title: primaryDim.name + ' breakdown',
+        role: 'hierarchy', size: 'col-6', icon: 'layout',
+        labels: labels, data: measures[0].nums, sub: measures[0].sub
+      });
+    }
+
+    // 9. Bubble — 3-measure relationship (x, y, size)
+    if (!dateCol && measures.length >= 3 && rows.length >= 5) {
+      charts.push({
+        kind: 'bubble',
+        title: measures[0].name + ' vs ' + measures[1].name + ' (size: ' + measures[2].name + ')',
+        role: 'relationship', size: 'col-6', icon: 'target',
+        xName: measures[0].name, yName: measures[1].name, sizeName: measures[2].name,
+        points: rows.map(function (r, i) { return [measures[0].nums[i], measures[1].nums[i], Math.abs(measures[2].nums[i]) || 0, String(labels[i] || '')]; })
+          .filter(function (p) { return !isNaN(p[0]) && !isNaN(p[1]); })
+      });
+    }
+
+    // Cap to keep the dashboard focused; the trend/comparison chart always leads.
+    return charts.slice(0, 6);
   }
 
   function buildInsights(cols, dateCol, measures, categories, primaryDim, rows, sigma) {

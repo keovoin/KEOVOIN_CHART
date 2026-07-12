@@ -54,6 +54,7 @@
   /* ---------- Chart cards ---------- */
   function renderChart(spec) {
     var card = el('div', 'card chart-card ' + (spec.size || 'col-6') + (spec.role === 'trend' ? ' tall' : ''));
+    card._spec = spec; // used by the editor for duplicate/delete rebuilds
     card.appendChild(cardHead(spec.title, spec.icon, spec.kind.toUpperCase()));
     var chartNode = el('div', 'chart');
     card.appendChild(chartNode);

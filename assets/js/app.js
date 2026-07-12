@@ -31,15 +31,21 @@
     t.textContent = msg; t.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(function () { t.classList.remove('show'); }, 2600);
   }
+  VIS.toast = toast;
 
   /* ---------- routing ---------- */
   function route(name) {
     document.querySelectorAll('.view').forEach(function (v) { v.classList.toggle('active', v.getAttribute('data-view') === name); });
     document.querySelectorAll('.nav-item').forEach(function (n) { n.classList.toggle('active', n.getAttribute('data-route') === name); });
-    var titles = { home: 'Home', studio: 'Studio', dashboard: 'Dashboard', templates: 'Templates', settings: 'Settings' };
+    var titles = { home: 'Home', studio: 'Studio', dashboard: 'Dashboard', infographic: 'Infographic', presentation: 'Presentation', templates: 'Templates', workspace: 'Workspace', history: 'History', settings: 'Settings' };
     document.getElementById('topbarTitle').textContent = titles[name] || 'VIS';
     closeSidebar();
+
     if (name === 'dashboard') setTimeout(function () { VIS.charts.resizeAll(); }, 60);
+    else if (name === 'presentation') buildPresentation();
+    else if (name === 'infographic') buildInfographic();
+    else if (name === 'history') VIS.history.renderInto(document.getElementById('historyList'), 'list');
+    else if (name === 'workspace') VIS.history.renderInto(document.getElementById('workspaceGrid'), 'gallery');
     window.scrollTo({ top: 0 });
   }
 
@@ -94,9 +100,21 @@
       meta.rows + ' rows · ' + meta.cols + ' fields · ' + meta.measures + ' measures · ' + meta.format.toUpperCase() +
       ' · ' + meta.generatedAt.toLocaleString();
 
+    VIS.editor && VIS.editor.reset();
     VIS.render(analysis, document.getElementById('dashboard'));
+    VIS.editor && VIS.editor.initBoardDnd();
     route('dashboard');
     toast('Dashboard generated');
+
+    // save to history
+    try {
+      VIS.history.save({
+        title: (title || document.getElementById('dashTitle').value || 'Untitled'),
+        dataText: text, theme: document.documentElement.getAttribute('data-theme'),
+        format: meta.format, rows: meta.rows, cols: meta.cols,
+        kpis: analysis.kpis.slice(0, 3).map(function (k) { return { label: k.label, formatted: k.formatted }; })
+      });
+    } catch (e) {}
 
     // Optional AI enhancement (async, non-blocking)
     if (VIS.ai && VIS.ai.isEnabled()) {
@@ -227,6 +245,168 @@
     var a = document.createElement('a'); a.href = uri; a.download = name; document.body.appendChild(a); a.click(); a.remove();
   }
 
+  /* ---------- presentation / infographic ---------- */
+  function buildPresentation() {
+    var mount = document.getElementById('presentation');
+    if (!state.analysis) return; // keep empty state
+    VIS.present.build(state.analysis, mount);
+  }
+  function buildInfographic() {
+    var mount = document.getElementById('infographic');
+    if (!state.analysis) return;
+    VIS.infographic.build(state.analysis, mount);
+  }
+
+  /* ---------- reduce / restore charts (used by AI chat) ---------- */
+  function reduceCharts() {
+    if (!state.analysis || state.analysis.charts.length <= 2) return false;
+    var reduced = Object.assign({}, state.analysis, { charts: state.analysis.charts.slice(0, 2) });
+    VIS.editor && VIS.editor.reset();
+    VIS.render(reduced, document.getElementById('dashboard'));
+    VIS.editor && VIS.editor.initBoardDnd();
+    route('dashboard');
+    return true;
+  }
+  function regenerateView() {
+    if (!state.analysis) return;
+    VIS.editor && VIS.editor.reset();
+    VIS.render(state.analysis, document.getElementById('dashboard'));
+    VIS.editor && VIS.editor.initBoardDnd();
+    route('dashboard');
+  }
+
+  /* ---------- extra exports: SVG / HTML / PPTX ---------- */
+  function exportSVG() {
+    var node = document.getElementById('dashboard');
+    if (!state.analysis) { toast('Nothing to export'); return; }
+    if (typeof htmlToImage === 'undefined') { toast('Export library not loaded'); return; }
+    toast('Rendering SVG…');
+    var bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#fff';
+    htmlToImage.toSvg(node, { backgroundColor: bg, cacheBust: true })
+      .then(function (dataUrl) { downloadURI(dataUrl, filename('svg')); toast('SVG downloaded'); })
+      .catch(function (e) { console.error(e); toast('SVG export failed'); });
+  }
+  function exportHTML() {
+    var node = document.getElementById('dashboard');
+    if (!state.analysis) { toast('Nothing to export'); return; }
+    if (typeof htmlToImage === 'undefined') { toast('Export library not loaded'); return; }
+    toast('Packaging HTML…');
+    var bg = getComputedStyle(document.documentElement).getPropertyValue('--bg').trim() || '#fff';
+    var title = document.getElementById('dashTitle').value || 'VIS Dashboard';
+    htmlToImage.toPng(node, { pixelRatio: 2, backgroundColor: bg, cacheBust: true }).then(function (dataUrl) {
+      var a = state.analysis;
+      var data = {
+        title: title, generatedAt: a.meta.generatedAt, summary: a.summary,
+        kpis: a.kpis.map(function (k) { return { label: k.label, formatted: k.formatted, delta: k.delta }; }),
+        insights: a.insights.map(function (i) { return { type: i.type, text: i.text.replace(/<[^>]+>/g, '') }; }),
+        recommendations: a.recommendations, data: a.table.rows
+      };
+      var html = '<!DOCTYPE html><html><head><meta charset="utf-8"><title>' + escAttr(title) +
+        '</title><meta name="viewport" content="width=device-width,initial-scale=1">' +
+        '<style>body{margin:0;background:' + bg + ';font-family:-apple-system,Segoe UI,Roboto,sans-serif;color:#0b1220}' +
+        '.wrap{max-width:1200px;margin:0 auto;padding:28px}h1{font-weight:800;letter-spacing:-.02em}' +
+        'img{width:100%;height:auto;border-radius:16px;box-shadow:0 20px 50px -20px rgba(0,0,0,.25)}' +
+        'footer{margin-top:20px;color:#94a3b8;font-size:13px}</style></head><body><div class="wrap">' +
+        '<h1>' + escHtml(title) + '</h1><img alt="dashboard" src="' + dataUrl + '"/>' +
+        '<footer>Generated by VIS · Visual Intelligence Studio · ' + new Date(a.meta.generatedAt).toLocaleString() + '</footer>' +
+        '<script type="application/json" id="vis-data">' + JSON.stringify(data).replace(/</g, '\\u003c') + '<\/script>' +
+        '</div></body></html>';
+      var blob = new Blob([html], { type: 'text/html' });
+      downloadURI(URL.createObjectURL(blob), filename('html'));
+      toast('HTML downloaded');
+    }).catch(function (e) { console.error(e); toast('HTML export failed'); });
+  }
+  function exportPPT() {
+    var node = document.getElementById('dashboard');
+    if (!state.analysis) { toast('Nothing to export'); return; }
+    if (typeof PptxGenJS === 'undefined' || typeof htmlToImage === 'undefined') { toast('PPTX library not loaded'); return; }
+    toast('Building PowerPoint…');
+    var bg = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#fff';
+    var pptx = new PptxGenJS();
+    pptx.defineLayout({ name: 'VIS', width: 13.33, height: 7.5 });
+    pptx.layout = 'VIS';
+    var a = state.analysis;
+    var title = document.getElementById('dashTitle').value || 'Executive Dashboard';
+
+    // Slide 1 — title
+    var s1 = pptx.addSlide(); s1.background = { color: 'FFFFFF' };
+    s1.addText('VISUAL INTELLIGENCE STUDIO', { x: 0.8, y: 2.4, fontSize: 12, color: '8892A6', bold: true, charSpacing: 2 });
+    s1.addText(title, { x: 0.8, y: 2.8, w: 11.7, fontSize: 40, bold: true, color: '0B1220' });
+    s1.addText(a.meta.rows + ' records · ' + a.meta.measures + ' measures · ' + new Date(a.meta.generatedAt).toLocaleDateString(), { x: 0.8, y: 4.0, fontSize: 14, color: '64748B' });
+
+    // Slide 2 — KPIs
+    var s2 = pptx.addSlide();
+    s2.addText('Key Metrics', { x: 0.6, y: 0.4, fontSize: 24, bold: true, color: '0B1220' });
+    a.kpis.slice(0, 6).forEach(function (k, i) {
+      var col = i % 3, row = Math.floor(i / 3);
+      var x = 0.6 + col * 4.2, y = 1.4 + row * 2.6;
+      s2.addShape(pptx.ShapeType.roundRect, { x: x, y: y, w: 3.9, h: 2.3, fill: { color: 'F4F6FA' }, line: { color: 'E2E8F0' }, rectRadius: 0.12 });
+      s2.addText(k.label, { x: x + 0.25, y: y + 0.25, w: 3.4, fontSize: 12, color: '64748B', bold: true });
+      s2.addText(k.formatted, { x: x + 0.25, y: y + 0.7, w: 3.4, fontSize: 30, bold: true, color: '0B1220' });
+      if (k.delta != null) s2.addText((k.delta >= 0 ? '▲ ' : '▼ ') + VIS.engine.fmtSigned(k.delta), { x: x + 0.25, y: y + 1.55, fontSize: 13, color: k.delta >= 0 ? '16A34A' : 'DC2626', bold: true });
+    });
+
+    // Slide 3 — dashboard image
+    htmlToImage.toPng(node, { pixelRatio: 2, backgroundColor: bg, cacheBust: true }).then(function (dataUrl) {
+      var img = new Image();
+      img.onload = function () {
+        var s3 = pptx.addSlide();
+        s3.addText('Dashboard', { x: 0.6, y: 0.3, fontSize: 20, bold: true, color: '0B1220' });
+        var ratio = img.width / img.height;
+        var maxW = 12.1, maxH = 6.2;
+        var w = maxW, h = w / ratio; if (h > maxH) { h = maxH; w = h * ratio; }
+        s3.addImage({ data: dataUrl, x: (13.33 - w) / 2, y: 0.9, w: w, h: h });
+
+        // Summary slide
+        var s4 = pptx.addSlide();
+        s4.addText('Executive Summary', { x: 0.6, y: 0.4, fontSize: 24, bold: true, color: '0B1220' });
+        s4.addText(a.summary.replace(/<[^>]+>/g, ''), { x: 0.6, y: 1.3, w: 12.1, h: 3, fontSize: 18, color: '334155', lineSpacingMultiple: 1.3 });
+        if (a.recommendations && a.recommendations.length) {
+          s4.addText('Recommendations', { x: 0.6, y: 4.4, fontSize: 16, bold: true, color: '0B1220' });
+          s4.addText(a.recommendations.map(function (r) { return { text: r, options: { bullet: true } }; }), { x: 0.8, y: 4.9, w: 12, fontSize: 14, color: '334155' });
+        }
+        pptx.writeFile({ fileName: filename('pptx') }).then(function () { toast('PowerPoint downloaded'); });
+      };
+      img.src = dataUrl;
+    }).catch(function (e) { console.error(e); toast('PPTX export failed'); });
+  }
+  function escHtml(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
+  function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }
+
+  function doExport(kind) {
+    if (kind === 'png') exportPNG();
+    else if (kind === 'svg') exportSVG();
+    else if (kind === 'pdf') exportPDF();
+    else if (kind === 'ppt') exportPPT();
+    else if (kind === 'html') exportHTML();
+    else if (kind === 'print') window.print();
+    else if (kind === 'json') exportJSON();
+  }
+
+  function exportInfographic() {
+    var node = document.getElementById('infoPoster');
+    if (!node) { toast('Nothing to export'); return; }
+    if (typeof htmlToImage === 'undefined') { toast('Export library not loaded'); return; }
+    toast('Rendering PNG…');
+    var bg = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#fff';
+    htmlToImage.toPng(node, { pixelRatio: 2, backgroundColor: bg, cacheBust: true })
+      .then(function (dataUrl) { downloadURI(dataUrl, filename('infographic.png')); toast('Infographic downloaded'); })
+      .catch(function (e) { console.error(e); toast('Export failed'); });
+  }
+
+  /* ---------- history ---------- */
+  function openHistory(id) {
+    var e = VIS.history.get(id);
+    if (!e) { toast('Entry not found'); return; }
+    if (e.theme) applyTheme(e.theme);
+    document.getElementById('dataInput').value = e.dataText;
+    generate(e.dataText, e.title);
+  }
+  function refreshHistoryViews() {
+    if (document.querySelector('[data-view="history"]').classList.contains('active')) VIS.history.renderInto(document.getElementById('historyList'), 'list');
+    if (document.querySelector('[data-view="workspace"]').classList.contains('active')) VIS.history.renderInto(document.getElementById('workspaceGrid'), 'gallery');
+  }
+
   /* ---------- sidebar (mobile) ---------- */
   function openSidebar() { document.getElementById('sidebar').classList.add('open'); backdrop().classList.add('show'); }
   function closeSidebar() { document.getElementById('sidebar').classList.remove('open'); var b = document.querySelector('.backdrop'); if (b) b.classList.remove('show'); }
@@ -291,15 +471,44 @@
       if (exp) {
         var kind = exp.getAttribute('data-export');
         document.getElementById('exportDrop').classList.remove('open');
-        if (kind === 'png') exportPNG();
-        else if (kind === 'pdf') exportPDF();
-        else if (kind === 'print') window.print();
-        else if (kind === 'json') exportJSON();
+        doExport(kind);
         return;
       }
+      // history open / delete
+      var hOpen = e.target.closest('[data-hist-open]');
+      if (hOpen) { openHistory(hOpen.getAttribute('data-hist-open')); return; }
+      var hDel = e.target.closest('[data-hist-del]');
+      if (hDel) { VIS.history.remove(hDel.getAttribute('data-hist-del')); refreshHistoryViews(); return; }
+
       // close export dropdown when clicking outside
       if (!e.target.closest('.export-menu')) document.getElementById('exportDrop').classList.remove('open');
     });
+
+    // editor toggle + undo/redo
+    var editToggle = document.getElementById('editToggle');
+    if (editToggle) editToggle.addEventListener('click', function () {
+      var on = VIS.editor.toggle();
+      editToggle.classList.toggle('btn-primary', on); editToggle.classList.toggle('btn-ghost', !on);
+      document.getElementById('editControls').style.display = on ? 'flex' : 'none';
+      toast(on ? 'Edit mode on — drag, resize, duplicate or delete cards' : 'Edit mode off');
+    });
+    var edU = document.getElementById('edUndo'), edR = document.getElementById('edRedo');
+    if (edU) edU.addEventListener('click', function () { VIS.editor.undo(); });
+    if (edR) edR.addEventListener('click', function () { VIS.editor.redo(); });
+
+    // present + infographic actions
+    var presentBtn = document.getElementById('presentBtn');
+    if (presentBtn) presentBtn.addEventListener('click', function () { route('presentation'); });
+    var presExport = document.getElementById('presExport');
+    if (presExport) presExport.addEventListener('click', function () { VIS.present.exportPDF(); });
+    var presRebuild = document.getElementById('presRebuild');
+    if (presRebuild) presRebuild.addEventListener('click', buildPresentation);
+    var infoExport = document.getElementById('infoExport');
+    if (infoExport) infoExport.addEventListener('click', exportInfographic);
+    var infoRegen = document.getElementById('infoRegen');
+    if (infoRegen) infoRegen.addEventListener('click', buildInfographic);
+    var clearHist = document.getElementById('clearHistory');
+    if (clearHist) clearHist.addEventListener('click', function () { VIS.history.clear(); refreshHistoryViews(); toast('History cleared'); });
 
     document.getElementById('generateBtn').addEventListener('click', function () { generate(); });
     document.getElementById('regenBtn').addEventListener('click', function () { if (state.lastText) generate(state.lastText, document.getElementById('dashTitle').value); });
@@ -351,12 +560,26 @@
     VIS.hydrateIcons(document);
     wire();
     updateDetect();
+    if (VIS.chat) VIS.chat.init();
     route('home');
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', init);
   else init();
 
-  // expose for debugging
-  VIS.app = { generate: generate, route: route, loadSample: loadSample };
+  // Public hooks (used by the AI chat panel and for debugging)
+  VIS.app = {
+    generate: generate,
+    route: route,
+    loadSample: loadSample,
+    setTheme: applyTheme,
+    setMode: applyMode,
+    getAnalysis: function () { return state.analysis; },
+    getSummary: function () { return state.analysis ? state.analysis.summary.replace(/<[^>]+>/g, '') : null; },
+    reduceCharts: reduceCharts,
+    regenerate: regenerateView,
+    makePresentation: function () { if (!state.analysis) return false; route('presentation'); return true; },
+    makeInfographic: function () { if (!state.analysis) return false; route('infographic'); return true; },
+    doExport: doExport
+  };
 })();

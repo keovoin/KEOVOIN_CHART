@@ -18,6 +18,7 @@
   <script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
   <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
 </head>
 <body>
   <!-- ======================= APP SHELL ======================= -->
@@ -41,7 +42,12 @@
         <button class="nav-item active" data-route="home"><span class="nav-ic" data-ic="home"></span>Home</button>
         <button class="nav-item" data-route="studio"><span class="nav-ic" data-ic="studio"></span>Studio</button>
         <button class="nav-item" data-route="dashboard"><span class="nav-ic" data-ic="dashboard"></span>Dashboard</button>
+        <button class="nav-item" data-route="infographic"><span class="nav-ic" data-ic="poster"></span>Infographic</button>
+        <button class="nav-item" data-route="presentation"><span class="nav-ic" data-ic="slides"></span>Presentation</button>
+        <div class="nav-sep"></div>
         <button class="nav-item" data-route="templates"><span class="nav-ic" data-ic="templates"></span>Templates</button>
+        <button class="nav-item" data-route="workspace"><span class="nav-ic" data-ic="dashboard"></span>Workspace</button>
+        <button class="nav-item" data-route="history"><span class="nav-ic" data-ic="history"></span>History</button>
         <button class="nav-item" data-route="settings"><span class="nav-ic" data-ic="settings"></span>Settings</button>
       </nav>
 
@@ -147,13 +153,21 @@ Jun, 81000, 40000, 240"></textarea>
               <div class="dash-meta" id="dashMeta">—</div>
             </div>
             <div class="dash-actions">
-              <button class="btn btn-ghost btn-sm" data-route="studio"><span data-ic="edit"></span>Edit data</button>
+              <div class="edit-controls" id="editControls" style="display:none">
+                <button class="icon-btn" id="edUndo" title="Undo" disabled><span data-ic="undo"></span></button>
+                <button class="icon-btn" id="edRedo" title="Redo" disabled><span data-ic="redo"></span></button>
+              </div>
+              <button class="btn btn-ghost btn-sm" id="editToggle" title="Edit layout"><span data-ic="edit"></span>Edit</button>
+              <button class="btn btn-ghost btn-sm" id="presentBtn"><span data-ic="slides"></span>Present</button>
               <button class="btn btn-ghost btn-sm" id="regenBtn"><span data-ic="refresh"></span>Regenerate</button>
               <div class="export-menu">
                 <button class="btn btn-primary btn-sm" id="exportBtn"><span data-ic="export"></span>Export</button>
                 <div class="export-drop" id="exportDrop">
                   <button data-export="png"><span data-ic="image"></span>PNG image</button>
+                  <button data-export="svg"><span data-ic="image"></span>SVG vector</button>
                   <button data-export="pdf"><span data-ic="pdf"></span>PDF report</button>
+                  <button data-export="ppt"><span data-ic="slides"></span>PowerPoint (.pptx)</button>
+                  <button data-export="html"><span data-ic="code"></span>Standalone HTML</button>
                   <button data-export="print"><span data-ic="print"></span>Print</button>
                   <button data-export="json"><span data-ic="code"></span>JSON data</button>
                 </div>
@@ -169,6 +183,49 @@ Jun, 81000, 40000, 240"></textarea>
               <button class="btn btn-primary" data-route="studio"><span data-ic="spark"></span>Open Studio</button>
             </div>
           </div>
+        </section>
+
+        <!-- ============ INFOGRAPHIC ============ -->
+        <section class="view" data-view="infographic">
+          <div class="dash-toolbar">
+            <div class="dash-title-block"><h2 class="view-h2">Infographic</h2><div class="dash-meta">A shareable, poster-style view of your dashboard.</div></div>
+            <div class="dash-actions">
+              <button class="btn btn-ghost btn-sm" id="infoRegen"><span data-ic="refresh"></span>Rebuild</button>
+              <button class="btn btn-primary btn-sm" id="infoExport"><span data-ic="image"></span>Export PNG</button>
+            </div>
+          </div>
+          <div id="infographic" class="infographic-wrap">
+            <div class="empty-state"><div class="empty-ic" data-ic="poster"></div><h3>No infographic yet</h3><p>Generate a dashboard first, then open Infographic.</p><button class="btn btn-primary" data-route="studio"><span data-ic="spark"></span>Open Studio</button></div>
+          </div>
+        </section>
+
+        <!-- ============ PRESENTATION ============ -->
+        <section class="view" data-view="presentation">
+          <div class="dash-toolbar">
+            <div class="dash-title-block"><h2 class="view-h2">Presentation</h2><div class="dash-meta">Use arrow keys to navigate. Press fullscreen to present.</div></div>
+            <div class="dash-actions">
+              <button class="btn btn-ghost btn-sm" id="presRebuild"><span data-ic="refresh"></span>Rebuild</button>
+              <button class="btn btn-primary btn-sm" id="presExport"><span data-ic="pdf"></span>Export PDF</button>
+            </div>
+          </div>
+          <div id="presentation" class="presentation-wrap">
+            <div class="empty-state"><div class="empty-ic" data-ic="slides"></div><h3>No presentation yet</h3><p>Generate a dashboard first, then open Presentation.</p><button class="btn btn-primary" data-route="studio"><span data-ic="spark"></span>Open Studio</button></div>
+          </div>
+        </section>
+
+        <!-- ============ WORKSPACE ============ -->
+        <section class="view" data-view="workspace">
+          <div class="section-head"><h2>Workspace</h2><p>Your saved dashboards. Open one to pick up where you left off.</p></div>
+          <div class="hist-grid" id="workspaceGrid"></div>
+        </section>
+
+        <!-- ============ HISTORY ============ -->
+        <section class="view" data-view="history">
+          <div class="section-head head-row">
+            <div><h2>History</h2><p>Every dashboard you generate is saved here automatically (in this browser).</p></div>
+            <button class="btn btn-ghost btn-sm" id="clearHistory"><span data-ic="trash"></span>Clear all</button>
+          </div>
+          <div class="hist-list" id="historyList"></div>
         </section>
 
         <!-- ============ TEMPLATES ============ -->
@@ -218,6 +275,11 @@ Jun, 81000, 40000, 240"></textarea>
   <script src="assets/js/charts.js"></script>
   <script src="assets/js/render.js"></script>
   <script src="assets/js/ai.js"></script>
+  <script src="assets/js/history.js"></script>
+  <script src="assets/js/present.js"></script>
+  <script src="assets/js/infographic.js"></script>
+  <script src="assets/js/editor.js"></script>
+  <script src="assets/js/chat.js"></script>
   <script src="assets/js/app.js"></script>
 </body>
 </html>
