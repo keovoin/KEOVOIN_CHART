@@ -1,0 +1,14 @@
+{
+  "ai": {
+    "enabled": false,
+    "endpoint": "",
+    "apiKey": "",
+    "model": "gpt-4o-mini"
+  },
+  "branding": {
+    "title": "VIS · Visual Intelligence Studio",
+    "defaultTheme": "executive-white",
+    "defaultMode": "light"
+  },
+  "adminToken": "vis-admin"
+}

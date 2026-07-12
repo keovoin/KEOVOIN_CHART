@@ -1,0 +1,16 @@
+{
+  "name": "vis-visual-intelligence-studio",
+  "version": "2.0.0",
+  "description": "VIS - Visual Intelligence Studio: turn pasted business data into executive dashboards. Team edition with a zero-dependency Node backend + admin portal.",
+  "type": "commonjs",
+  "scripts": {
+    "start": "node server/server.js",
+    "fetch-vendor": "node scripts/fetch-vendor.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {},
+  "private": true,
+  "license": "MIT"
+}

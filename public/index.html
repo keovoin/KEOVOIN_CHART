@@ -6,7 +6,8 @@
   <title>VIS · Visual Intelligence Studio</title>
   <meta name="description" content="Turn pasted business data into beautiful executive dashboards, insights and presentations." />
 
-  <!-- Fonts -->
+  <!-- Fonts: use the local vendored stylesheet if present, else Google Fonts,
+       else the system font stack (defined in app.css) — so it never blocks. -->
   <link rel="preconnect" href="https://fonts.googleapis.com" />
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet" />
@@ -14,11 +15,20 @@
   <!-- Styles -->
   <link rel="stylesheet" href="assets/css/app.css" />
 
-  <!-- Libraries (loaded in the user's browser via CDN) -->
-  <script defer src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-  <script defer src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"></script>
+  <!--
+    Libraries load LOCAL-FIRST (assets/vendor/*), falling back to CDN only if a
+    vendored copy is not present. Run scripts/fetch-vendor.sh once (on a machine
+    with internet) to populate assets/vendor/ and the app becomes fully offline —
+    no external requests at all. Ideal for internal / air-gapped deployments.
+  -->
+  <script src="assets/vendor/echarts.min.js"></script>
+  <script>window.echarts||document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/echarts@5.5.0/dist/echarts.min.js"><\/scr'+'ipt>');</script>
+  <script src="assets/vendor/html-to-image.js"></script>
+  <script>window.htmlToImage||document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/html-to-image@1.11.11/dist/html-to-image.js"><\/scr'+'ipt>');</script>
+  <script src="assets/vendor/jspdf.umd.min.js"></script>
+  <script>window.jspdf||document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"><\/scr'+'ipt>');</script>
+  <script src="assets/vendor/pptxgen.bundle.js"></script>
+  <script>window.PptxGenJS||document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"><\/scr'+'ipt>');</script>
 </head>
 <body>
   <!-- ======================= APP SHELL ======================= -->

@@ -602,3 +602,9 @@ table.data td.num { text-align:right; font-variant-numeric: tabular-nums; }
   .chat-panel { right: 8px; bottom: 8px; }
   .info-hero-value { font-size: 48px; }
 }
+
+
+/* Team AI status chip (Settings) */
+.status-chip { font-size: 12.5px; font-weight: 700; padding: 4px 12px; border-radius: 999px; }
+.status-chip.on { color: var(--pos); background: color-mix(in srgb, var(--pos) 14%, transparent); }
+.status-chip.off { color: var(--text-3); background: var(--surface-2); border: 1px solid var(--line); }

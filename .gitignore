@@ -1,0 +1,11 @@
+# Runtime server config (contains the AI API key + admin token) — never commit
+server/config.json
+
+# Vendored browser libs are optional; uncomment to keep them out of git and
+# fetch them at deploy time with scripts/fetch-vendor.sh instead.
+# public/assets/vendor/
+
+# Node
+node_modules/
+npm-debug.log*
+.DS_Store
