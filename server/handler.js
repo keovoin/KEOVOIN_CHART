@@ -94,17 +94,31 @@ function dashPersist(list) {
   dashMem = list; return Promise.resolve(true);
 }
 
-/* ----------------------------- sessions ----------------------------- */
-const sessions = new Map();
-const SESSION_TTL = 1000 * 60 * 60 * 8;
-function newSession() { const sid = crypto.randomBytes(24).toString('hex'); sessions.set(sid, Date.now() + SESSION_TTL); return sid; }
-function validSession(sid) { if (!sid || !sessions.has(sid)) return false; if (sessions.get(sid) < Date.now()) { sessions.delete(sid); return false; } return true; }
+/* ----------------------------- sessions (stateless, signed cookie) -----------------------------
+   Serverless (Vercel) runs each request on a possibly-different instance, so an
+   in-memory session store breaks: you log in on one instance and the next
+   request lands on another with no memory of it. We instead issue an HMAC-signed
+   token that any instance can verify with the shared secret — no server state. */
+const SESSION_TTL = 1000 * 60 * 60 * 8; // 8h
+function sessionSecret() { return String(process.env.VIS_SESSION_SECRET || process.env.VIS_ADMIN_TOKEN || config.adminToken || 'vis') + '::vis-session-v1'; }
+function sign(payload) { return crypto.createHmac('sha256', sessionSecret()).update(payload).digest('hex'); }
+function makeToken() { const payload = String(Date.now() + SESSION_TTL); return payload + '.' + sign(payload); }
+function validToken(tok) {
+  if (!tok || tok.indexOf('.') === -1) return false;
+  const i = tok.lastIndexOf('.'); const payload = tok.slice(0, i); const sig = tok.slice(i + 1);
+  let expected; try { expected = sign(payload); } catch (e) { return false; }
+  if (sig.length !== expected.length) return false;
+  let ok = true; for (let k = 0; k < expected.length; k++) if (sig[k] !== expected[k]) ok = false; // constant-time-ish
+  if (!ok) return false;
+  const exp = parseInt(payload, 10);
+  return !!exp && exp > Date.now();
+}
 function parseCookies(req) {
   const out = {};
   (req.headers.cookie || '').split(';').forEach(p => { const i = p.indexOf('='); if (i > -1) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim()); });
   return out;
 }
-function isAdmin(req) { return validSession(parseCookies(req).vis_admin); }
+function isAdmin(req) { return validToken(parseCookies(req).vis_admin); }
 
 /* ----------------------------- helpers ----------------------------- */
 function sendJSON(res, status, obj, headers) {
@@ -113,12 +127,21 @@ function sendJSON(res, status, obj, headers) {
   res.end(body);
 }
 function readBody(req) {
-  if (req.body && typeof req.body === 'object') return Promise.resolve(req.body); // some platforms pre-parse
+  // Serverless platforms (Vercel) often pre-parse the body onto req.body and
+  // consume the stream, so we must handle object / string / Buffer up front.
+  if (req.body !== undefined && req.body !== null) {
+    var b = req.body;
+    if (Buffer.isBuffer(b)) { try { return Promise.resolve(JSON.parse(b.toString('utf8') || '{}')); } catch (e) { return Promise.resolve({}); } }
+    if (typeof b === 'string') { try { return Promise.resolve(b ? JSON.parse(b) : {}); } catch (e) { return Promise.resolve({}); } }
+    if (typeof b === 'object') return Promise.resolve(b);
+  }
   return new Promise((resolve) => {
-    let data = ''; let size = 0;
+    let data = ''; let size = 0; let done = false;
+    var finish = function (v) { if (!done) { done = true; resolve(v); } };
     req.on('data', c => { size += c.length; if (size > 5e6) { req.destroy(); return; } data += c; });
-    req.on('end', () => { try { resolve(data ? JSON.parse(data) : {}); } catch (e) { resolve(null); } });
-    req.on('error', () => resolve(null));
+    req.on('end', () => { try { finish(data ? JSON.parse(data) : {}); } catch (e) { finish({}); } });
+    req.on('error', () => finish({}));
+    setTimeout(function () { try { finish(data ? JSON.parse(data) : {}); } catch (e) { finish({}); } }, 8000);
   });
 }
 function maskKey(k) { if (!k) return ''; if (k.length <= 8) return '••••'; return k.slice(0, 3) + '••••••' + k.slice(-4); }
@@ -242,12 +265,12 @@ async function handleRequest(req, res) {
 
       if (pathname === '/api/admin/login' && req.method === 'POST') {
         const body = await readBody(req) || {};
-        if (!body.token || body.token !== config.adminToken) return sendJSON(res, 401, { error: 'Invalid admin token' });
-        const sid = newSession();
-        return sendJSON(res, 200, { ok: true }, { 'Set-Cookie': `vis_admin=${sid}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${SESSION_TTL / 1000}` });
+        const given = String(body.token == null ? '' : body.token).trim();
+        const expected = String(config.adminToken == null ? '' : config.adminToken).trim();
+        if (!given || given !== expected) return sendJSON(res, 401, { error: 'Invalid admin token' });
+        return sendJSON(res, 200, { ok: true }, { 'Set-Cookie': `vis_admin=${makeToken()}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL / 1000}` });
       }
       if (pathname === '/api/admin/logout' && req.method === 'POST') {
-        const sid = parseCookies(req).vis_admin; if (sid) sessions.delete(sid);
         return sendJSON(res, 200, { ok: true }, { 'Set-Cookie': 'vis_admin=; HttpOnly; Path=/; Max-Age=0' });
       }
 
