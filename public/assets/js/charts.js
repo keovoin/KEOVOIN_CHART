@@ -43,6 +43,16 @@
   function axisLabel(c) { return { color: c.text3, fontSize: 11, fontFamily: 'Inter' }; }
   function splitLine(c) { return { lineStyle: { color: c.line, type: 'dashed' } }; }
 
+  // Data-value label (respects the Settings "Data labels" toggle; on by default)
+  function labelsOn() { return !(window.VIS && window.VIS.settings && window.VIS.settings.labels === false); }
+  function valLabel(c, sub, position, color) {
+    return {
+      show: labelsOn(), position: position || 'top',
+      color: color || c.text2, fontSize: 10, fontWeight: 600, fontFamily: 'Inter',
+      formatter: function (p) { return fmt(p.value, sub); }
+    };
+  }
+
   var Builders = {
     area: function (spec, c, pal, anim) {
       return {
@@ -53,6 +63,7 @@
           return {
             name: s.name, type: 'line', smooth: true, showSymbol: false, data: s.data,
             lineStyle: { width: 3 },
+            label: valLabel(c, s.sub, 'top'), labelLayout: { hideOverlap: true },
             areaStyle: { opacity: 0.18, color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [
               { offset: 0, color: pal[i % pal.length] }, { offset: 1, color: 'transparent' }]) },
             animationDuration: anim ? 900 : 0
@@ -68,7 +79,7 @@
         xAxis: { type: 'category', data: spec.x, boundaryGap: false, axisLine: { lineStyle: { color: c.line } }, axisTick: { show: false }, axisLabel: axisLabel(c) },
         yAxis: { type: 'value', splitLine: splitLine(c), axisLabel: Object.assign({ formatter: function (v) { return fmt(v); } }, axisLabel(c)) },
         series: spec.series.map(function (s) {
-          return { name: s.name, type: 'line', smooth: true, showSymbol: false, symbolSize: 6, data: s.data, lineStyle: { width: 2.5 }, emphasis: { focus: 'series' }, animationDuration: anim ? 900 : 0 };
+          return { name: s.name, type: 'line', smooth: true, showSymbol: false, symbolSize: 6, data: s.data, lineStyle: { width: 2.5 }, label: valLabel(c, s.sub, 'top'), labelLayout: { hideOverlap: true }, emphasis: { focus: 'series' }, animationDuration: anim ? 900 : 0 };
         })
       };
     },
@@ -79,7 +90,7 @@
         xAxis: { type: 'category', data: spec.x, axisLine: { lineStyle: { color: c.line } }, axisTick: { show: false }, axisLabel: Object.assign({ interval: 0, rotate: spec.x.length > 6 ? 30 : 0 }, axisLabel(c)) },
         yAxis: { type: 'value', splitLine: splitLine(c), axisLabel: Object.assign({ formatter: function (v) { return fmt(v, spec.series[0].sub); } }, axisLabel(c)) },
         series: spec.series.map(function (s) {
-          return { name: s.name, type: 'bar', data: s.data, barMaxWidth: 44, itemStyle: { borderRadius: [8, 8, 0, 0], color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: pal[0] }, { offset: 1, color: pal[1] || pal[0] }]) }, animationDuration: anim ? 800 : 0 };
+          return { name: s.name, type: 'bar', data: s.data, barMaxWidth: 44, label: valLabel(c, s.sub, 'top'), labelLayout: { hideOverlap: true }, itemStyle: { borderRadius: [8, 8, 0, 0], color: new echarts.graphic.LinearGradient(0, 0, 0, 1, [{ offset: 0, color: pal[0] }, { offset: 1, color: pal[1] || pal[0] }]) }, animationDuration: anim ? 800 : 0 };
         })
       };
     },
@@ -90,7 +101,7 @@
         color: pal, grid: { left: 8, right: 24, top: 12, bottom: 8, containLabel: true }, tooltip: Object.assign(tooltip(c), { axisPointer: { type: 'shadow' } }),
         xAxis: { type: 'value', splitLine: splitLine(c), axisLabel: Object.assign({ formatter: function (v) { return fmt(v, spec.series[0].sub); } }, axisLabel(c)) },
         yAxis: { type: 'category', data: pairs.map(function (p) { return p[0]; }), axisLine: { lineStyle: { color: c.line } }, axisTick: { show: false }, axisLabel: axisLabel(c) },
-        series: [{ type: 'bar', data: pairs.map(function (p) { return p[1]; }), barMaxWidth: 22, itemStyle: { borderRadius: [0, 6, 6, 0], color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: pal[1] || pal[0] }, { offset: 1, color: pal[0] }]) }, animationDuration: anim ? 800 : 0 }]
+        series: [{ type: 'bar', data: pairs.map(function (p) { return p[1]; }), barMaxWidth: 22, label: valLabel(c, spec.series[0].sub, 'right'), itemStyle: { borderRadius: [0, 6, 6, 0], color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: pal[1] || pal[0] }, { offset: 1, color: pal[0] }]) }, animationDuration: anim ? 800 : 0 }]
       };
     },
 
@@ -212,7 +223,7 @@
         xAxis: { type: 'category', data: spec.x, axisLine: { lineStyle: { color: c.line } }, axisTick: { show: false }, axisLabel: Object.assign({ interval: 0, rotate: spec.x.length > 6 ? 30 : 0 }, axisLabel(c)) },
         yAxis: { type: 'value', splitLine: splitLine(c), axisLabel: Object.assign({ formatter: function (v) { return fmt(v); } }, axisLabel(c)) },
         series: spec.series.map(function (s, i) {
-          return { name: s.name, type: 'bar', stack: 'total', data: s.data, barMaxWidth: 46, itemStyle: { borderRadius: i === spec.series.length - 1 ? [6, 6, 0, 0] : 0, color: pal[i % pal.length] }, emphasis: { focus: 'series' }, animationDuration: anim ? 800 : 0 };
+          return { name: s.name, type: 'bar', stack: 'total', data: s.data, barMaxWidth: 46, label: valLabel(c, s.sub, 'inside', '#fff'), labelLayout: { hideOverlap: true }, itemStyle: { borderRadius: i === spec.series.length - 1 ? [6, 6, 0, 0] : 0, color: pal[i % pal.length] }, emphasis: { focus: 'series' }, animationDuration: anim ? 800 : 0 };
         })
       };
     },
@@ -234,7 +245,7 @@
         yAxis: { type: 'value', splitLine: splitLine(c), axisLabel: Object.assign({ formatter: function (v) { return fmt(v, spec.sub); } }, axisLabel(c)) },
         series: [
           { type: 'bar', stack: 'w', itemStyle: { color: 'transparent' }, data: base, silent: true },
-          { type: 'bar', stack: 'w', barMaxWidth: 44, data: vals.map(function (v, i) { return { value: v, itemStyle: { color: colors[i], borderRadius: 4 } }; }), animationDuration: anim ? 800 : 0 }
+          { type: 'bar', stack: 'w', barMaxWidth: 44, label: valLabel(c, spec.sub, 'top'), labelLayout: { hideOverlap: true }, data: vals.map(function (v, i) { return { value: v, itemStyle: { color: colors[i], borderRadius: 4 } }; }), animationDuration: anim ? 800 : 0 }
         ]
       };
     },
