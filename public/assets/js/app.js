@@ -116,19 +116,49 @@
       });
     } catch (e) {}
 
-    // Optional AI enhancement (async, non-blocking)
+    // AI polish (async, non-blocking) — applied across ALL views
+    state.aiPending = false;
     if (VIS.ai && VIS.ai.isEnabled()) {
-      toast('Enhancing with AI…');
-      VIS.ai.enhance(analysis).then(function (res) {
+      state.aiPending = true;
+      setPolishing(true);
+      state.enhancePromise = VIS.ai.enhance(analysis).then(function (res) {
+        state.aiPending = false; setPolishing(false);
         if (!res) { toast('AI unavailable — using built-in analysis'); return; }
+        if (res.headline) analysis.headline = res.headline;
+        if (res.tagline) analysis.tagline = res.tagline;
         if (res.summary) analysis.summary = res.summary;
         if (res.insights && res.insights.length) analysis.insights = res.insights;
         if (res.recommendations && res.recommendations.length) analysis.recommendations = res.recommendations;
         analysis.aiEnhanced = true;
-        VIS.render(analysis, document.getElementById('dashboard'));
-        toast('AI insights applied');
-      });
+        refreshActiveDataView();   // repaint whichever of dashboard/infographic/presentation is showing
+        toast('Polished with AI');
+      }).catch(function () { state.aiPending = false; setPolishing(false); });
     }
+  }
+
+  /* Rebuild whichever data-driven view is currently active so AI polish shows everywhere. */
+  function refreshActiveDataView() {
+    if (!state.analysis) return;
+    var active = document.querySelector('.view.active');
+    var name = active && active.getAttribute('data-view');
+    if (name === 'infographic') buildInfographic();
+    else if (name === 'presentation') buildPresentation();
+    else { VIS.editor && VIS.editor.reset(); VIS.render(state.analysis, document.getElementById('dashboard')); VIS.editor && VIS.editor.initBoardDnd(); }
+  }
+
+  /* Subtle "polishing with AI" indicator on the topbar. */
+  function setPolishing(on) {
+    var bar = document.getElementById('topbarTitle');
+    if (!bar) return;
+    var existing = document.getElementById('polishBadge');
+    if (on) {
+      if (!existing) {
+        var b = document.createElement('span');
+        b.id = 'polishBadge'; b.className = 'polish-badge';
+        b.innerHTML = '<span class="polish-dot"></span>Polishing with AI…';
+        bar.parentNode.insertBefore(b, bar.nextSibling);
+      }
+    } else if (existing) { existing.remove(); }
   }
 
   /* ---------- samples ---------- */

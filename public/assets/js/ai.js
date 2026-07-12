@@ -81,8 +81,8 @@
   function buildPrompt(analysis) {
     var lines = [];
     lines.push('You are an executive business analyst. Given the dataset summary below, respond ONLY with strict minified JSON matching:');
-    lines.push('{"summary": string (2-3 sentences), "insights": [{"type":"pos|neg|warn|info","text":string}] (3-5), "recommendations": [string] (3-4)}');
-    lines.push('No markdown, no code fences, no text outside the JSON.');
+    lines.push('{"headline": string (<=6 words, punchy title), "tagline": string (<=14 words, one-line takeaway), "summary": string (2-3 sentences), "insights": [{"type":"pos|neg|warn|info","text":string}] (3-5), "recommendations": [string] (3-4)}');
+    lines.push('Polished, executive tone. No markdown, no code fences, no text outside the JSON.');
     lines.push('');
     lines.push('DATASET: ' + (analysis.title || 'Business data') + ' — ' + analysis.meta.rows + ' rows, ' + analysis.meta.cols + ' fields.');
     if (analysis.dateCol) lines.push('Time dimension: ' + analysis.dateCol.name + ' (' + analysis.dateCol.values.join(', ') + ')');
@@ -111,6 +111,8 @@
     if (s !== -1 && e !== -1) txt = txt.slice(s, e + 1);
     try {
       var obj = JSON.parse(txt); var out = {};
+      if (typeof obj.headline === 'string') out.headline = obj.headline.trim();
+      if (typeof obj.tagline === 'string') out.tagline = obj.tagline.trim();
       if (typeof obj.summary === 'string') out.summary = obj.summary;
       if (Array.isArray(obj.insights)) out.insights = obj.insights.map(function (i) {
         var type = (i.type || 'info').toLowerCase();
