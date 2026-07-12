@@ -419,6 +419,50 @@
       });
     }
 
+    // 10. Funnel — stage/step data or a strictly-decreasing measure
+    if (!dateCol && categories.length && measures.length) {
+      // Require stage-like semantics (a descending ranking is NOT a funnel).
+      var funnelName = /stage|step|funnel|phase|pipeline|conversion/i.test(primaryDim.name) ||
+        /stage|step|funnel/i.test(measures[0].name);
+      if (funnelName) {
+        charts.unshift({
+          kind: 'funnel', title: measures[0].name + ' by ' + primaryDim.name,
+          role: 'funnel', size: 'col-6', icon: 'target',
+          labels: primaryDim.values.map(String), data: measures[0].nums, sub: measures[0].sub
+        });
+      }
+    }
+
+    // 11. Sankey — source / target / value columns present
+    var srcCol = cols.find(function (c) { return c.type === 'category' && /source|from|origin/i.test(c.name); });
+    var tgtCol = cols.find(function (c) { return c.type === 'category' && /target|dest|to\b|toward/i.test(c.name); });
+    if (srcCol && tgtCol && srcCol !== tgtCol && measures.length) {
+      var vCol = measures[0], nodeSet = {}, links = [];
+      rows.forEach(function (r, i) {
+        var s = String(srcCol.values[i]), t = String(tgtCol.values[i]), v = vCol.nums[i];
+        if (!s || !t || s === t || isNaN(v)) return;
+        nodeSet[s] = 1; nodeSet[t] = 1; links.push({ source: s, target: t, value: Math.abs(v) });
+      });
+      var nodes = Object.keys(nodeSet).map(function (n) { return { name: n }; });
+      if (nodes.length && links.length) {
+        charts.unshift({ kind: 'sankey', title: srcCol.name + ' \u2192 ' + tgtCol.name, role: 'flow', size: 'col-8', icon: 'layout', nodes: nodes, links: links });
+      }
+    }
+
+    // 12. Gantt — task + start + end columns present
+    var startCol = cols.find(function (c) { return c.type === 'number' && /start|begin/i.test(c.name); });
+    var endCol = cols.find(function (c) { return c.type === 'number' && /(end|finish|due|complete)/i.test(c.name); });
+    if (startCol && endCol && categories.length) {
+      var taskCol = categories[0];
+      var tasks = rows.map(function (r, i) { return { name: String(taskCol.values[i]), start: startCol.nums[i], end: endCol.nums[i] }; })
+        .filter(function (t) { return !isNaN(t.start) && !isNaN(t.end); });
+      if (tasks.length) {
+        var mn = Math.min.apply(null, tasks.map(function (t) { return t.start; }));
+        var mx = Math.max.apply(null, tasks.map(function (t) { return t.end; }));
+        charts.unshift({ kind: 'gantt', title: 'Timeline', role: 'timeline', size: 'col-8', icon: 'calendar', tasks: tasks, min: mn, max: mx });
+      }
+    }
+
     // Cap to keep the dashboard focused; the trend/comparison chart always leads.
     return charts.slice(0, 6);
   }

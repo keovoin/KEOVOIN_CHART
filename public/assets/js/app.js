@@ -86,11 +86,21 @@
   function generate(text, title) {
     text = text != null ? text : document.getElementById('dataInput').value;
     if (!text.trim()) { toast('Paste some data first'); route('studio'); return; }
-    var table = VIS.engine.parse(text);
-    if (!table.columns.length || !table.rows.length) { toast('Could not detect a valid table'); return; }
+    var table;
+    try { table = VIS.engine.parse(text); } catch (e) { console.error(e); toast('Could not read that data — check the format'); route('studio'); return; }
+    if (!table.columns.length || !table.rows.length) { toast('Could not detect a valid table — need a header row and at least one data row'); route('studio'); return; }
+    if (!table.columns.some(function (c) { return c && c.trim(); })) { toast('No column headers found'); route('studio'); return; }
 
     state.lastText = text;
-    var analysis = VIS.engine.analyze(table, { sigma: VIS.settings.sigma, maxKpi: VIS.settings.maxKpi });
+    var analysis;
+    try {
+      analysis = VIS.engine.analyze(table, { sigma: VIS.settings.sigma, maxKpi: VIS.settings.maxKpi });
+    } catch (e) {
+      console.error('[VIS] analysis failed', e);
+      showDashError('We couldn\u2019t analyze that dataset. Try cleaner column headers or a simpler table.');
+      route('dashboard');
+      return;
+    }
     if (title) analysis.title = title;
     state.analysis = analysis;
 
@@ -159,6 +169,17 @@
         bar.parentNode.insertBefore(b, bar.nextSibling);
       }
     } else if (existing) { existing.remove(); }
+  }
+
+  /* Friendly error card when a dataset can't be analyzed. */
+  function showDashError(msg) {
+    var d = document.getElementById('dashboard');
+    if (!d) return;
+    VIS.charts && VIS.charts.disposeAll && VIS.charts.disposeAll();
+    d.innerHTML = '<div class="dash-error"><div class="empty-ic" data-ic="alert"></div>' +
+      '<h3>Something went wrong</h3><p>' + msg + '</p>' +
+      '<button class="btn btn-primary" data-route="studio"><span data-ic="edit"></span>Back to Studio</button></div>';
+    VIS.hydrateIcons(d);
   }
 
   /* ---------- samples ---------- */

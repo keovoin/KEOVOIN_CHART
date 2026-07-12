@@ -158,6 +158,53 @@
       };
     },
 
+    funnel: function (spec, c, pal, anim) {
+      var data = spec.labels.map(function (l, i) { return { name: l, value: Math.abs(spec.data[i]) || 0 }; });
+      return {
+        color: pal,
+        tooltip: { trigger: 'item', backgroundColor: c.surface, borderColor: c.line, borderWidth: 1, textStyle: { color: c.text, fontSize: 12 }, extraCssText: 'border-radius:12px;padding:10px 12px;', formatter: function (p) { return p.name + ': <b>' + fmt(p.value, spec.sub) + '</b>'; } },
+        series: [{
+          type: 'funnel', left: '6%', right: '6%', top: 12, bottom: 12, minSize: '24%', maxSize: '100%',
+          sort: 'descending', gap: 3, funnelAlign: 'center',
+          label: { show: true, position: 'inside', color: '#fff', fontSize: 12, fontWeight: 600, formatter: '{b}' },
+          itemStyle: { borderColor: c.surface, borderWidth: 2 },
+          emphasis: { label: { fontSize: 14 } }, data: data, animationDuration: anim ? 800 : 0
+        }]
+      };
+    },
+
+    sankey: function (spec, c, pal, anim) {
+      return {
+        color: pal,
+        tooltip: { trigger: 'item', triggerOn: 'mousemove', backgroundColor: c.surface, borderColor: c.line, borderWidth: 1, textStyle: { color: c.text, fontSize: 12 }, extraCssText: 'border-radius:12px;padding:10px 12px;' },
+        series: [{
+          type: 'sankey', left: 8, right: 8, top: 12, bottom: 12,
+          data: spec.nodes, links: spec.links, nodeGap: 12, nodeWidth: 14,
+          emphasis: { focus: 'adjacency' },
+          label: { color: c.text2, fontSize: 11, fontFamily: 'Inter' },
+          lineStyle: { color: 'gradient', opacity: 0.35, curveness: 0.5 },
+          itemStyle: { borderWidth: 0 }, animationDuration: anim ? 900 : 0
+        }]
+      };
+    },
+
+    gantt: function (spec, c, pal, anim) {
+      // spec.tasks: [{name, start, end}] on a numeric timeline; invisible offset + duration bar
+      var names = spec.tasks.map(function (t) { return t.name; });
+      var base = spec.tasks.map(function (t) { return t.start; });
+      var dur = spec.tasks.map(function (t) { return Math.max(0, t.end - t.start); });
+      return {
+        grid: { left: 8, right: 24, top: 10, bottom: 8, containLabel: true },
+        tooltip: { trigger: 'item', backgroundColor: c.surface, borderColor: c.line, borderWidth: 1, textStyle: { color: c.text, fontSize: 12 }, extraCssText: 'border-radius:12px;padding:10px 12px;', formatter: function (p) { if (p.seriesIndex === 0) return ''; var t = spec.tasks[p.dataIndex]; return '<b>' + t.name + '</b><br/>' + (spec.unit || '') + t.start + ' → ' + (spec.unit || '') + t.end; } },
+        xAxis: { type: 'value', min: spec.min, max: spec.max, splitLine: splitLine(c), axisLabel: Object.assign({ formatter: function (v) { return (spec.unit || '') + v; } }, axisLabel(c)) },
+        yAxis: { type: 'category', data: names, inverse: true, axisLine: { lineStyle: { color: c.line } }, axisTick: { show: false }, axisLabel: axisLabel(c) },
+        series: [
+          { type: 'bar', stack: 'g', itemStyle: { color: 'transparent' }, data: base, silent: true },
+          { type: 'bar', stack: 'g', barMaxWidth: 20, data: dur, itemStyle: { borderRadius: 5, color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: pal[0] }, { offset: 1, color: pal[1] || pal[0] }]) }, animationDuration: anim ? 800 : 0 }
+        ]
+      };
+    },
+
     stacked: function (spec, c, pal, anim) {
       return {
         color: pal, grid: baseGrid(), tooltip: Object.assign(tooltip(c), { axisPointer: { type: 'shadow' } }),

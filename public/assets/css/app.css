@@ -127,10 +127,11 @@ h1,h2,h3,h4 { line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; font
   --card-shadow:0 1px 2px rgba(0,0,0,.06), 0 6px 16px -10px rgba(0,0,0,.18);
 }
 
-/* Notion — flat, opaque, sharp small radius, no shadow, hairline borders */
+/* Notion — flat, opaque, sharp small radius, no shadow, VISIBLE hairline borders */
 [data-theme="notion"] {
   --radius:6px; --radius-sm:5px; --btn-radius:6px; --chip-radius:6px; --blur:0px;
   --card:var(--surface); --card-shadow:none; --border-w:1px; --card-pad:18px; --title-spacing:-.02em;
+  --card-border:color-mix(in srgb, var(--text) 15%, transparent);
   --font-sans:ui-sans-serif,-apple-system,'Segoe UI','Inter',sans-serif;
 }
 
@@ -138,7 +139,8 @@ h1,h2,h3,h4 { line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; font
 [data-theme="vercel"] {
   --radius:8px; --radius-sm:6px; --btn-radius:8px; --chip-radius:6px; --blur:0px;
   --card:var(--surface); --border-w:1px; --card-pad:20px; --title-weight:800; --title-spacing:-.04em;
-  --card-shadow:0 2px 4px rgba(0,0,0,.05), 0 1px 0 var(--line);
+  --card-border:color-mix(in srgb, var(--text) 20%, transparent);
+  --card-shadow:none;
 }
 
 /* Material 3 — elevation shadows, rounded, pill buttons */
@@ -197,9 +199,40 @@ h1,h2,h3,h4 { line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; font
 /* Corporate — flat, dense, bordered, restrained */
 [data-theme="corporate"] {
   --radius:6px; --radius-sm:5px; --btn-radius:6px; --chip-radius:5px; --blur:0px;
-  --card:var(--surface); --card-pad:18px; --gap:14px;
-  --card-shadow:0 1px 2px rgba(0,0,0,.06), 0 4px 12px -8px rgba(0,0,0,.14);
+  --card:var(--surface); --card-pad:18px; --gap:14px; --border-w:1.5px;
+  --card-border:color-mix(in srgb, var(--text) 18%, transparent);
+  --card-shadow:none;
 }
+
+/* =========================================================================
+   THEME SIGNATURES — element-level flourishes so each theme is unmistakable
+   ========================================================================= */
+/* Cyber: uppercase mono labels + glowing accents */
+[data-theme="cyber"] .card-title,
+[data-theme="cyber"] .s-kicker,
+[data-theme="cyber"] .info-kicker,
+[data-theme="cyber"] .hint-title,
+[data-theme="cyber"] .card-badge { text-transform:uppercase; letter-spacing:.14em; font-family:var(--font-display); }
+[data-theme="cyber"] .brand-name { letter-spacing:.06em; }
+
+/* Luxury: uppercase spaced kickers + gold hairline atop cards */
+[data-theme="luxury"] .info-kicker,
+[data-theme="luxury"] .s-kicker,
+[data-theme="luxury"] .hero-badge,
+[data-theme="luxury"] .card-title { text-transform:uppercase; letter-spacing:.18em; }
+[data-theme="luxury"] .dashboard > .card { border-top:2px solid var(--accent); }
+
+/* Material: uppercase, tracked button text (M3 style) */
+[data-theme="material"] .btn { text-transform:uppercase; letter-spacing:.04em; font-weight:700; }
+
+/* Notion: understated, tighter labels */
+[data-theme="notion"] .card-title { text-transform:none; letter-spacing:0; color:var(--text-2); }
+
+/* Glass & Apple: extra translucency so the blur reads clearly */
+[data-theme="glass"] .card,
+[data-theme="apple"] .card { background:color-mix(in srgb, var(--surface) 62%, transparent); }
+[data-mode="dark"][data-theme="glass"] .card,
+[data-mode="dark"][data-theme="apple"] .card { background:color-mix(in srgb, var(--surface) 55%, transparent); }
 
 /* =========================================================================
    APP SHELL
@@ -236,7 +269,7 @@ h1,h2,h3,h4 { line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; font
 .nav { display:flex; flex-direction:column; gap:2px; }
 .nav-item {
   display:flex; align-items:center; gap:11px;
-  padding: 10px 12px; border-radius: 12px;
+  padding: 10px 12px; border-radius: var(--radius-sm);
   font-size: 14px; font-weight: 500; color: var(--text-2);
   transition: background .18s, color .18s;
   text-align:left;
@@ -266,7 +299,7 @@ h1,h2,h3,h4 { line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; font
 .topbar-actions { margin-left:auto; display:flex; align-items:center; gap:10px; }
 
 .icon-btn {
-  width:38px; height:38px; border-radius:11px; display:grid; place-items:center;
+  width:38px; height:38px; border-radius:var(--radius-sm); display:grid; place-items:center;
   border:1px solid var(--line); background: var(--surface); color:var(--text-2);
   transition: background .15s, color .15s, border-color .15s;
 }
@@ -275,7 +308,7 @@ h1,h2,h3,h4 { line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; font
 
 .select, .input {
   border:1px solid var(--line); background: var(--surface); color:var(--text);
-  border-radius:11px; padding: 8px 12px; font-size:13px; font-weight:500;
+  border-radius:var(--radius-sm); padding: 8px 12px; font-size:13px; font-weight:500;
   outline:none; transition: border-color .15s, box-shadow .15s;
 }
 .select:focus, .input:focus { border-color: var(--accent); box-shadow: 0 0 0 3px var(--accent-soft); }
@@ -729,3 +762,18 @@ table.data td.num { text-align:right; font-variant-numeric: tabular-nums; }
 
 /* Infographic AI tagline */
 .info-tagline { margin-top:10px; font-size:16px; font-weight:600; opacity:.95; line-height:1.4; }
+
+
+/* =========================================================================
+   ACCESSIBILITY
+   ========================================================================= */
+:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; border-radius: 4px; }
+.btn:focus-visible, .icon-btn:focus-visible, .chip:focus-visible, .nav-item:focus-visible,
+.select:focus-visible, .input:focus-visible, .chat-input:focus-visible { outline: 2px solid var(--accent); outline-offset: 2px; }
+/* Respect users who prefer less motion */
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after { animation-duration: .001ms !important; animation-iteration-count: 1 !important; transition-duration: .001ms !important; scroll-behavior: auto !important; }
+}
+/* Error state for malformed data */
+.dash-error { grid-column: span 12; text-align: center; padding: 60px 20px; }
+.dash-error .empty-ic { background: color-mix(in srgb, var(--neg) 14%, transparent); color: var(--neg); }
