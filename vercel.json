@@ -3,11 +3,14 @@
   "trailingSlash": false,
   "outputDirectory": "public",
   "functions": {
-    "api/**/*.js": {
+    "api/index.js": {
       "includeFiles": "server/**",
       "maxDuration": 30
     }
   },
+  "rewrites": [
+    { "source": "/api/(.*)", "destination": "/api/index" }
+  ],
   "headers": [
     {
       "source": "/assets/(.*)",
