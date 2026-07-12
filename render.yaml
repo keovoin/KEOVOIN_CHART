@@ -1,0 +1,33 @@
+# VIS · one-click cloud deploy (Render.com)
+# Render reads this file automatically. It runs the Node backend (zero deps),
+# gives you a public HTTPS URL, and redeploys on every push to the repo.
+#
+# How to deploy (no local machine, ~2 minutes):
+#   1. Go to https://dashboard.render.com  ->  New  ->  Blueprint
+#   2. Connect this GitHub repo (keovoin/KEOVOIN_CHART)
+#   3. Render detects this file and creates the service
+#   4. When prompted, set VIS_ADMIN_TOKEN (and optionally the AI vars below)
+#   5. Click Apply  ->  your app is live at https://<name>.onrender.com
+#      (admin portal at https://<name>.onrender.com/admin)
+services:
+  - type: web
+    name: vis
+    runtime: node
+    plan: free
+    branch: main
+    autoDeploy: true
+    buildCommand: "echo 'No build step - VIS has zero npm dependencies.'"
+    startCommand: "node server/server.js"
+    healthCheckPath: /api/health
+    envVars:
+      # Required: the password for the /admin portal. Set this in the Render UI.
+      - key: VIS_ADMIN_TOKEN
+        sync: false
+      # Optional: pre-configure the AI provider via env (survives restarts).
+      # You can also leave these blank and set them later in the admin portal.
+      - key: VIS_AI_ENDPOINT
+        sync: false
+      - key: VIS_AI_KEY
+        sync: false
+      - key: VIS_AI_MODEL
+        value: gpt-4o-mini

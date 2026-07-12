@@ -86,29 +86,42 @@ VIS ships as a **frontend + backend**:
 - **`public/`** — the frontend (static HTML/CSS/JS). Works on its own for personal/demo use.
 - **`server/`** — a small **Node.js backend with zero npm dependencies** (standard library only). It serves the frontend, keeps the AI API key **server-side**, proxies AI requests, and powers the admin portal.
 
-## Team deployment (recommended)
+## Deploy to the cloud (recommended — no local machine)
 
-Run the backend so your whole team shares one securely-managed AI key.
+Host the full app (frontend + backend + admin portal) on a public HTTPS URL your team can open. Pick one:
 
-```bash
-# 1) (optional, for offline/internal networks) vendor the browser libraries once
-#    on a machine with internet, so nothing loads from a public CDN:
-bash scripts/fetch-vendor.sh        # or: npm run fetch-vendor
+### Option A · Render (easiest, free tier)
 
-# 2) start the server (no install needed — zero dependencies)
-VIS_ADMIN_TOKEN="choose-a-strong-token" npm start
-#   → app:   http://localhost:4000
-#   → admin: http://localhost:4000/admin
-```
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/keovoin/KEOVOIN_CHART)
 
-Or with Docker:
+1. Click the button above (or: [dashboard.render.com](https://dashboard.render.com) → **New → Blueprint** → connect this repo).
+2. Render reads the included `render.yaml` and creates the service — **no build, no install**.
+3. When prompted, set **`VIS_ADMIN_TOKEN`** (your admin password). Optionally set `VIS_AI_ENDPOINT`, `VIS_AI_KEY`, `VIS_AI_MODEL` now, or add them later in the admin portal.
+4. Click **Apply**. In ~1–2 minutes you get a live URL:
+   - App: `https://<your-name>.onrender.com`
+   - Admin: `https://<your-name>.onrender.com/admin`
 
-```bash
-docker build -t vis .
-docker run -p 4000:4000 -e VIS_ADMIN_TOKEN="choose-a-strong-token" vis
-```
+Every push to `main` auto-redeploys.
 
-Environment variables (all optional): `PORT`, `VIS_ADMIN_TOKEN`, `VIS_AI_ENDPOINT`, `VIS_AI_KEY`, `VIS_AI_MODEL`.
+### Option B · Railway
+[railway.app](https://railway.app) → **New Project → Deploy from GitHub** → pick this repo. Railway auto-detects Node and runs `npm start`. Add the same env vars under **Variables**.
+
+### Option C · Fly.io (Docker)
+`fly launch --now` (uses the included `Dockerfile` + `fly.toml`), then `fly secrets set VIS_ADMIN_TOKEN=… VIS_AI_KEY=… VIS_AI_ENDPOINT=…`.
+
+> **Why not GitHub Pages / Vercel-static?** Those only serve static files and **can't run the backend**, so the admin portal and server-side key wouldn't work there. Use one of the options above for the full team tool. (You can still publish just the `public/` folder to Pages/Vercel for a keyless personal demo — see below.)
+
+### Environment variables
+| Variable | Purpose |
+|---|---|
+| `VIS_ADMIN_TOKEN` | Password for the `/admin` portal (**set this**) |
+| `VIS_AI_ENDPOINT` | Your AI provider's base or chat-completions URL |
+| `VIS_AI_KEY` | Your AI API key (stays on the server) |
+| `VIS_AI_MODEL` | Model name (default `gpt-4o-mini`) |
+| `PORT` | Set automatically by the host |
+
+### Run it yourself (optional)
+If you ever *do* want it on your own machine or server: `VIS_ADMIN_TOKEN="strong-token" npm start` (zero dependencies), or `docker build -t vis . && docker run -p 4000:4000 -e VIS_ADMIN_TOKEN="strong-token" vis`.
 
 ### Admin portal
 
