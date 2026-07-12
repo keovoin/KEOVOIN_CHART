@@ -90,7 +90,22 @@ VIS ships as a **frontend + backend**:
 
 Host the full app (frontend + backend + admin portal) on a public HTTPS URL your team can open. Pick one:
 
-### Option A · Render (easiest, free tier)
+### Option A · Vercel
+
+VIS runs on Vercel with the frontend served statically and the backend as a **serverless function** (`api/[...path].js`). The API key stays server-side.
+
+1. Push this repo to GitHub, then on [vercel.com](https://vercel.com): **Add New → Project → Import** this repo.
+2. Framework preset: **Other** (the included `vercel.json` handles the rest — no build command needed).
+3. Open **Settings → Environment Variables** and add:
+   - `VIS_ADMIN_TOKEN` — your admin password
+   - `VIS_AI_ENDPOINT` — your AI provider URL
+   - `VIS_AI_KEY` — your AI API key (stays on the server)
+   - `VIS_AI_MODEL` — e.g. `gpt-4o-mini`
+4. **Deploy** → live at `https://<project>.vercel.app` (admin at `/admin`).
+
+> On Vercel the filesystem is read-only, so **configure via Environment Variables** (above) — that's the persistent source of truth. The admin portal still works for live viewing/tweaks, but set the key via env vars so it survives restarts. On a persistent host (Render/Fly) the admin portal saves to disk normally.
+
+### Option B · Render (free tier, persistent admin portal)
 
 [![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/keovoin/KEOVOIN_CHART)
 
@@ -103,13 +118,13 @@ Host the full app (frontend + backend + admin portal) on a public HTTPS URL your
 
 Every push to `main` auto-redeploys.
 
-### Option B · Railway
+### Option C · Railway
 [railway.app](https://railway.app) → **New Project → Deploy from GitHub** → pick this repo. Railway auto-detects Node and runs `npm start`. Add the same env vars under **Variables**.
 
-### Option C · Fly.io (Docker)
+### Option D · Fly.io (Docker)
 `fly launch --now` (uses the included `Dockerfile` + `fly.toml`), then `fly secrets set VIS_ADMIN_TOKEN=… VIS_AI_KEY=… VIS_AI_ENDPOINT=…`.
 
-> **Why not GitHub Pages / Vercel-static?** Those only serve static files and **can't run the backend**, so the admin portal and server-side key wouldn't work there. Use one of the options above for the full team tool. (You can still publish just the `public/` folder to Pages/Vercel for a keyless personal demo — see below.)
+> **Which to pick?** **Vercel** is great and what most teams reach for — just configure the key via Environment Variables. **Render / Fly** additionally let the admin portal save settings to disk (persistent filesystem). **GitHub Pages** only serves static files and can't run the backend, so use it only for a keyless personal demo of `public/`.
 
 ### Environment variables
 | Variable | Purpose |

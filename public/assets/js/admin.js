@@ -40,7 +40,11 @@
       $('aiEnabled').checked = !!c.ai.enabled;
       $('aiEndpoint').value = c.ai.endpoint || '';
       $('aiModel').value = c.ai.model || '';
-      $('keyNote').textContent = c.ai.hasKey ? ('A key is stored (' + c.ai.keyMasked + '). Leave the field blank to keep it.') : 'No key stored yet.';
+      var keyMsg = c.ai.hasKey ? ('A key is stored (' + c.ai.keyMasked + '). Leave the field blank to keep it.') : 'No key stored yet.';
+      if (c.persistent === false) {
+        keyMsg += ' ⚠ This host has a read-only filesystem (e.g. Vercel), so changes here apply live but reset on restart. For a permanent setup, configure VIS_AI_ENDPOINT / VIS_AI_KEY / VIS_AI_MODEL as environment variables in your hosting dashboard.';
+      }
+      $('keyNote').textContent = keyMsg;
       updateStatus(c.ai.enabled && c.ai.hasKey);
       $('brTitle').value = (c.branding && c.branding.title) || '';
       buildThemeOptions();
