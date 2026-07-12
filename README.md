@@ -86,29 +86,57 @@ VIS ships as a **frontend + backend**:
 - **`public/`** — the frontend (static HTML/CSS/JS). Works on its own for personal/demo use.
 - **`server/`** — a small **Node.js backend with zero npm dependencies** (standard library only). It serves the frontend, keeps the AI API key **server-side**, proxies AI requests, and powers the admin portal.
 
-## Team deployment (recommended)
+## Deploy to the cloud (recommended — no local machine)
 
-Run the backend so your whole team shares one securely-managed AI key.
+Host the full app (frontend + backend + admin portal) on a public HTTPS URL your team can open. Pick one:
 
-```bash
-# 1) (optional, for offline/internal networks) vendor the browser libraries once
-#    on a machine with internet, so nothing loads from a public CDN:
-bash scripts/fetch-vendor.sh        # or: npm run fetch-vendor
+### Option A · Vercel
 
-# 2) start the server (no install needed — zero dependencies)
-VIS_ADMIN_TOKEN="choose-a-strong-token" npm start
-#   → app:   http://localhost:4000
-#   → admin: http://localhost:4000/admin
-```
+VIS runs on Vercel with the frontend served statically and the backend as a **serverless function** (`api/[...path].js`). The API key stays server-side.
 
-Or with Docker:
+1. Push this repo to GitHub, then on [vercel.com](https://vercel.com): **Add New → Project → Import** this repo.
+2. Framework preset: **Other** (the included `vercel.json` handles the rest — no build command needed).
+3. Open **Settings → Environment Variables** and add:
+   - `VIS_ADMIN_TOKEN` — your admin password
+   - `VIS_AI_ENDPOINT` — your AI provider URL
+   - `VIS_AI_KEY` — your AI API key (stays on the server)
+   - `VIS_AI_MODEL` — e.g. `gpt-4o-mini`
+4. **Deploy** → live at `https://<project>.vercel.app` (admin at `/admin`).
 
-```bash
-docker build -t vis .
-docker run -p 4000:4000 -e VIS_ADMIN_TOKEN="choose-a-strong-token" vis
-```
+> On Vercel the filesystem is read-only, so **configure via Environment Variables** (above) — that's the persistent source of truth. The admin portal still works for live viewing/tweaks, but set the key via env vars so it survives restarts. On a persistent host (Render/Fly) the admin portal saves to disk normally.
 
-Environment variables (all optional): `PORT`, `VIS_ADMIN_TOKEN`, `VIS_AI_ENDPOINT`, `VIS_AI_KEY`, `VIS_AI_MODEL`.
+### Option B · Render (free tier, persistent admin portal)
+
+[![Deploy to Render](https://render.com/images/deploy-to-render-button.svg)](https://render.com/deploy?repo=https://github.com/keovoin/KEOVOIN_CHART)
+
+1. Click the button above (or: [dashboard.render.com](https://dashboard.render.com) → **New → Blueprint** → connect this repo).
+2. Render reads the included `render.yaml` and creates the service — **no build, no install**.
+3. When prompted, set **`VIS_ADMIN_TOKEN`** (your admin password). Optionally set `VIS_AI_ENDPOINT`, `VIS_AI_KEY`, `VIS_AI_MODEL` now, or add them later in the admin portal.
+4. Click **Apply**. In ~1–2 minutes you get a live URL:
+   - App: `https://<your-name>.onrender.com`
+   - Admin: `https://<your-name>.onrender.com/admin`
+
+Every push to `main` auto-redeploys.
+
+### Option C · Railway
+[railway.app](https://railway.app) → **New Project → Deploy from GitHub** → pick this repo. Railway auto-detects Node and runs `npm start`. Add the same env vars under **Variables**.
+
+### Option D · Fly.io (Docker)
+`fly launch --now` (uses the included `Dockerfile` + `fly.toml`), then `fly secrets set VIS_ADMIN_TOKEN=… VIS_AI_KEY=… VIS_AI_ENDPOINT=…`.
+
+> **Which to pick?** **Vercel** is great and what most teams reach for — just configure the key via Environment Variables. **Render / Fly** additionally let the admin portal save settings to disk (persistent filesystem). **GitHub Pages** only serves static files and can't run the backend, so use it only for a keyless personal demo of `public/`.
+
+### Environment variables
+| Variable | Purpose |
+|---|---|
+| `VIS_ADMIN_TOKEN` | Password for the `/admin` portal (**set this**) |
+| `VIS_AI_ENDPOINT` | Your AI provider's base or chat-completions URL |
+| `VIS_AI_KEY` | Your AI API key (stays on the server) |
+| `VIS_AI_MODEL` | Model name (default `gpt-4o-mini`) |
+| `PORT` | Set automatically by the host |
+
+### Run it yourself (optional)
+If you ever *do* want it on your own machine or server: `VIS_ADMIN_TOKEN="strong-token" npm start` (zero dependencies), or `docker build -t vis . && docker run -p 4000:4000 -e VIS_ADMIN_TOKEN="strong-token" vis`.
 
 ### Admin portal
 

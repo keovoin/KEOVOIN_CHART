@@ -1,0 +1,23 @@
+# VIS · Fly.io deploy (uses the included Dockerfile)
+#   1. Install flyctl and run:  fly launch --now   (accepts this config)
+#   2. Set secrets:             fly secrets set VIS_ADMIN_TOKEN=... VIS_AI_KEY=... VIS_AI_ENDPOINT=...
+#   3. Live at:                 https://<app>.fly.dev   (admin at /admin)
+app = "vis"
+primary_region = "iad"
+
+[build]
+  dockerfile = "Dockerfile"
+
+[env]
+  PORT = "4000"
+
+[http_service]
+  internal_port = 4000
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 0
+
+[[vm]]
+  size = "shared-cpu-1x"
+  memory = "256mb"

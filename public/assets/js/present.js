@@ -24,8 +24,9 @@
     // Slide 1 — Title
     slidesWrap.appendChild(slide('title',
       '<div class="s-title-block">' +
-        '<div class="s-kicker">VISUAL INTELLIGENCE STUDIO</div>' +
+        '<div class="s-kicker">' + (analysis.aiEnhanced ? 'AI-POLISHED BRIEFING' : 'VISUAL INTELLIGENCE STUDIO') + '</div>' +
         '<h1 class="s-title">' + esc(title) + '</h1>' +
+        (analysis.tagline ? '<div class="s-sub" style="font-size:clamp(15px,2vw,24px);color:var(--text);font-weight:500">' + esc(analysis.tagline) + '</div>' : '') +
         '<div class="s-sub">' + analysis.meta.rows + ' records · ' + analysis.meta.measures + ' key measures · ' + new Date(analysis.meta.generatedAt).toLocaleDateString() + '</div>' +
       '</div>'));
 

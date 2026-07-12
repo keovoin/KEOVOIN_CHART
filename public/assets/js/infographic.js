@@ -17,8 +17,9 @@
 
     // Header
     poster.appendChild(el('div', 'info-header',
-      '<div class="info-kicker">VISUAL INTELLIGENCE STUDIO</div>' +
-      '<h1 class="info-title">' + esc(title) + '</h1>' +
+      '<div class="info-kicker">' + (analysis.aiEnhanced ? 'AI-POLISHED REPORT' : 'VISUAL INTELLIGENCE STUDIO') + '</div>' +
+      '<h1 class="info-title">' + esc(analysis.headline || title) + '</h1>' +
+      (analysis.tagline ? '<div class="info-tagline">' + esc(analysis.tagline) + '</div>' : '') +
       '<div class="info-date">' + new Date(analysis.meta.generatedAt).toLocaleDateString(undefined, { year: 'numeric', month: 'long', day: 'numeric' }) +
       ' · ' + analysis.meta.rows + ' records analyzed</div>'));
 

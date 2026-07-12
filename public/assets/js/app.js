@@ -86,11 +86,21 @@
   function generate(text, title) {
     text = text != null ? text : document.getElementById('dataInput').value;
     if (!text.trim()) { toast('Paste some data first'); route('studio'); return; }
-    var table = VIS.engine.parse(text);
-    if (!table.columns.length || !table.rows.length) { toast('Could not detect a valid table'); return; }
+    var table;
+    try { table = VIS.engine.parse(text); } catch (e) { console.error(e); toast('Could not read that data — check the format'); route('studio'); return; }
+    if (!table.columns.length || !table.rows.length) { toast('Could not detect a valid table — need a header row and at least one data row'); route('studio'); return; }
+    if (!table.columns.some(function (c) { return c && c.trim(); })) { toast('No column headers found'); route('studio'); return; }
 
     state.lastText = text;
-    var analysis = VIS.engine.analyze(table, { sigma: VIS.settings.sigma, maxKpi: VIS.settings.maxKpi });
+    var analysis;
+    try {
+      analysis = VIS.engine.analyze(table, { sigma: VIS.settings.sigma, maxKpi: VIS.settings.maxKpi });
+    } catch (e) {
+      console.error('[VIS] analysis failed', e);
+      showDashError('We couldn\u2019t analyze that dataset. Try cleaner column headers or a simpler table.');
+      route('dashboard');
+      return;
+    }
     if (title) analysis.title = title;
     state.analysis = analysis;
 
@@ -116,19 +126,60 @@
       });
     } catch (e) {}
 
-    // Optional AI enhancement (async, non-blocking)
+    // AI polish (async, non-blocking) — applied across ALL views
+    state.aiPending = false;
     if (VIS.ai && VIS.ai.isEnabled()) {
-      toast('Enhancing with AI…');
-      VIS.ai.enhance(analysis).then(function (res) {
+      state.aiPending = true;
+      setPolishing(true);
+      state.enhancePromise = VIS.ai.enhance(analysis).then(function (res) {
+        state.aiPending = false; setPolishing(false);
         if (!res) { toast('AI unavailable — using built-in analysis'); return; }
+        if (res.headline) analysis.headline = res.headline;
+        if (res.tagline) analysis.tagline = res.tagline;
         if (res.summary) analysis.summary = res.summary;
         if (res.insights && res.insights.length) analysis.insights = res.insights;
         if (res.recommendations && res.recommendations.length) analysis.recommendations = res.recommendations;
         analysis.aiEnhanced = true;
-        VIS.render(analysis, document.getElementById('dashboard'));
-        toast('AI insights applied');
-      });
+        refreshActiveDataView();   // repaint whichever of dashboard/infographic/presentation is showing
+        toast('Polished with AI');
+      }).catch(function () { state.aiPending = false; setPolishing(false); });
     }
+  }
+
+  /* Rebuild whichever data-driven view is currently active so AI polish shows everywhere. */
+  function refreshActiveDataView() {
+    if (!state.analysis) return;
+    var active = document.querySelector('.view.active');
+    var name = active && active.getAttribute('data-view');
+    if (name === 'infographic') buildInfographic();
+    else if (name === 'presentation') buildPresentation();
+    else { VIS.editor && VIS.editor.reset(); VIS.render(state.analysis, document.getElementById('dashboard')); VIS.editor && VIS.editor.initBoardDnd(); }
+  }
+
+  /* Subtle "polishing with AI" indicator on the topbar. */
+  function setPolishing(on) {
+    var bar = document.getElementById('topbarTitle');
+    if (!bar) return;
+    var existing = document.getElementById('polishBadge');
+    if (on) {
+      if (!existing) {
+        var b = document.createElement('span');
+        b.id = 'polishBadge'; b.className = 'polish-badge';
+        b.innerHTML = '<span class="polish-dot"></span>Polishing with AI…';
+        bar.parentNode.insertBefore(b, bar.nextSibling);
+      }
+    } else if (existing) { existing.remove(); }
+  }
+
+  /* Friendly error card when a dataset can't be analyzed. */
+  function showDashError(msg) {
+    var d = document.getElementById('dashboard');
+    if (!d) return;
+    VIS.charts && VIS.charts.disposeAll && VIS.charts.disposeAll();
+    d.innerHTML = '<div class="dash-error"><div class="empty-ic" data-ic="alert"></div>' +
+      '<h3>Something went wrong</h3><p>' + msg + '</p>' +
+      '<button class="btn btn-primary" data-route="studio"><span data-ic="edit"></span>Back to Studio</button></div>';
+    VIS.hydrateIcons(d);
   }
 
   /* ---------- samples ---------- */

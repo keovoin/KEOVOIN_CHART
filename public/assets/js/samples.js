@@ -83,6 +83,53 @@
 'Nova Analytics,28,33,7,6\n' +
 'Titan Compliance,63,60,4,9\n' +
 'Vega Mobile,71,80,5,7'
+    },
+
+    funnel: {
+      title: 'Conversion Funnel',
+      icon: 'target',
+      color: '#7928ca',
+      desc: 'Stage-by-stage drop-off from visitor to customer.',
+      tags: ['Funnel', 'Conversion'],
+      data:
+'Stage,Users\n' +
+'Visitors,12000\n' +
+'Sign-ups,4200\n' +
+'Qualified,1800\n' +
+'Trials,760\n' +
+'Customers,320'
+    },
+
+    flow: {
+      title: 'Traffic Flow',
+      icon: 'layout',
+      color: '#0e7490',
+      desc: 'How users move from source to destination (Sankey).',
+      tags: ['Sankey', 'Flow'],
+      data:
+'Source,Target,Users\n' +
+'Search,Homepage,4200\n' +
+'Social,Homepage,2100\n' +
+'Email,Homepage,1200\n' +
+'Homepage,Pricing,3800\n' +
+'Homepage,Blog,1900\n' +
+'Pricing,Signup,1600\n' +
+'Blog,Signup,700'
+    },
+
+    roadmap: {
+      title: 'Delivery Roadmap',
+      icon: 'calendar',
+      color: '#b45309',
+      desc: 'Project phases on a timeline (Gantt).',
+      tags: ['Gantt', 'Timeline'],
+      data:
+'Task,Start,End\n' +
+'Discovery,0,2\n' +
+'Design,2,5\n' +
+'Build,4,10\n' +
+'QA,9,12\n' +
+'Launch,12,13'
     }
   };
 
