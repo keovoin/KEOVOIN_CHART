@@ -10,11 +10,17 @@
     ['finance', 'Finance'], ['cyber', 'Cyber'], ['luxury', 'Luxury'], ['glass', 'Glass'], ['corporate', 'Corporate']
   ];
 
+  var TOKEN_KEY = 'vis.admin.token';
+  function getToken() { try { return sessionStorage.getItem(TOKEN_KEY) || ''; } catch (e) { return ''; } }
+  function setToken(t) { try { t ? sessionStorage.setItem(TOKEN_KEY, t) : sessionStorage.removeItem(TOKEN_KEY); } catch (e) {} }
+
   function $(id) { return document.getElementById(id); }
   function api(path, opts) {
     opts = opts || {};
     opts.credentials = 'same-origin';
     opts.headers = Object.assign({ 'Content-Type': 'application/json' }, opts.headers || {});
+    var tok = getToken();
+    if (tok) opts.headers['X-Admin-Token'] = tok; // cookie-independent auth (robust on serverless)
     return fetch(path, opts).then(function (r) { return r.json().then(function (j) { return { status: r.status, body: j }; }).catch(function () { return { status: r.status, body: {} }; }); });
   }
   function msg(el, text, kind) { el.textContent = text; el.className = 'msg ' + (kind || 'ok'); if (text) setTimeout(function () { if (el.textContent === text) el.className = 'msg'; }, 4000); }
@@ -27,9 +33,9 @@
     var token = $('tokenInput').value.trim();
     if (!token) return msg($('loginMsg'), 'Enter the admin token.', 'err');
     api('/api/admin/login', { method: 'POST', body: JSON.stringify({ token: token }) }).then(function (r) {
-      if (r.status === 200) { $('tokenInput').value = ''; showAdmin(); }
+      if (r.status === 200) { setToken(token); $('tokenInput').value = ''; showAdmin(); }
       else msg($('loginMsg'), r.body.error || 'Sign-in failed.', 'err');
-    }).catch(function () { msg($('loginMsg'), 'Cannot reach the server. Is the backend running?', 'err'); });
+    }).catch(function () { msg($('loginMsg'), 'Cannot reach the server — make sure you are on the app\u2019s Vercel URL (not github.io) and the backend is running.', 'err'); });
   }
 
   /* ---- load current config ---- */
@@ -106,7 +112,7 @@
     });
   }
 
-  function logout() { api('/api/admin/logout', { method: 'POST' }).then(showLogin); }
+  function logout() { api('/api/admin/logout', { method: 'POST' }).then(function () { setToken(''); showLogin(); }); }
 
   /* ---- init ---- */
   document.addEventListener('DOMContentLoaded', function () {

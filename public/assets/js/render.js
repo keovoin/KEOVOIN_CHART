@@ -55,11 +55,22 @@
   function renderChart(spec) {
     var card = el('div', 'card chart-card ' + (spec.size || 'col-6') + (spec.role === 'trend' ? ' tall' : ''));
     card._spec = spec; // used by the editor for duplicate/delete rebuilds
-    card.appendChild(cardHead(spec.title, spec.icon, spec.kind.toUpperCase()));
+
+    var head = el('div', 'card-head');
+    head.appendChild(el('div', 'card-title', '<span class="t-ic" data-ic="' + (spec.icon || 'chart') + '"></span>' + spec.title));
+    var actions = el('div', 'card-head-actions');
+    actions.appendChild(el('span', 'card-badge', spec.kind.toUpperCase()));
+    var copyBtn = el('button', 'card-copy', '<span data-ic="copy"></span>');
+    copyBtn.setAttribute('title', 'Copy chart as image'); copyBtn.setAttribute('aria-label', 'Copy chart as image');
+    copyBtn.addEventListener('click', function (e) { e.stopPropagation(); VIS.charts.copyChart(card._chart, spec.title, copyBtn); });
+    actions.appendChild(copyBtn);
+    head.appendChild(actions);
+    card.appendChild(head);
+
     var chartNode = el('div', 'chart');
     card.appendChild(chartNode);
-    // defer so the node has dimensions
-    requestAnimationFrame(function () { requestAnimationFrame(function () { VIS.charts.build(spec, chartNode); }); });
+    // defer so the node has dimensions, keep the instance for copy/export
+    requestAnimationFrame(function () { requestAnimationFrame(function () { card._chart = VIS.charts.build(spec, chartNode); }); });
     return card;
   }
 

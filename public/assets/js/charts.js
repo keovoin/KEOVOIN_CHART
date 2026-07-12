@@ -326,5 +326,24 @@
 
   window.addEventListener('resize', function () { clearTimeout(window.__visRz); window.__visRz = setTimeout(resizeAll, 120); });
 
-  window.VIS.charts = { build: build, resizeAll: resizeAll, disposeAll: disposeAll, Builders: Builders };
+  // Copy a chart instance to the clipboard as a PNG image (fallback: download).
+  function copyChart(chart, title, btn) {
+    if (!chart || typeof chart.getDataURL !== 'function') { window.VIS.toast && window.VIS.toast('Chart not ready yet'); return; }
+    var bg = cssVar('--surface', '#ffffff');
+    var url;
+    try { url = chart.getDataURL({ type: 'png', pixelRatio: 2, backgroundColor: bg }); }
+    catch (e) { window.VIS.toast && window.VIS.toast('Could not render image'); return; }
+    var name = (title || 'chart').replace(/[^a-z0-9]+/gi, '-').replace(/^-|-$/g, '').toLowerCase() + '.png';
+    function download() { var a = document.createElement('a'); a.href = url; a.download = name; document.body.appendChild(a); a.click(); a.remove(); window.VIS.toast && window.VIS.toast('Copy unsupported here — downloaded PNG instead'); }
+    if (navigator.clipboard && window.ClipboardItem) {
+      fetch(url).then(function (r) { return r.blob(); }).then(function (blob) {
+        return navigator.clipboard.write([new window.ClipboardItem({ 'image/png': blob })]);
+      }).then(function () {
+        window.VIS.toast && window.VIS.toast('Chart copied — paste it anywhere');
+        if (btn) { btn.classList.add('copied'); setTimeout(function () { btn.classList.remove('copied'); }, 1200); }
+      }).catch(function () { download(); });
+    } else { download(); }
+  }
+
+  window.VIS.charts = { build: build, resizeAll: resizeAll, disposeAll: disposeAll, copyChart: copyChart, Builders: Builders };
 })();

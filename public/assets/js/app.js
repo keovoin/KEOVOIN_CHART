@@ -374,25 +374,50 @@
       toast('HTML downloaded');
     }).catch(function (e) { console.error(e); toast('HTML export failed'); });
   }
+  function pptPalette() {
+    var raw = getComputedStyle(document.documentElement).getPropertyValue('--chart-palette').trim();
+    return raw.split(',').map(function (s) { return s.trim().replace('#', ''); }).filter(Boolean);
+  }
+  // Map a VIS chart spec to a NATIVE (editable) pptxgenjs chart. Returns null if
+  // the type has no native PowerPoint equivalent (those stay in PNG/PDF export).
+  function pptMapChart(pptx, spec) {
+    var pal = pptPalette();
+    var base = { x: 0.6, y: 1.2, w: 12.1, h: 5.5, chartColors: pal, showLegend: false, legendPos: 'b', showValue: false };
+    switch (spec.kind) {
+      case 'line': case 'area':
+        return { type: pptx.ChartType.line, data: spec.series.map(function (s) { return { name: s.name, labels: spec.x, values: s.data }; }), opts: Object.assign({}, base, { lineSmooth: true, showLegend: spec.series.length > 1 }) };
+      case 'bar':
+        return { type: pptx.ChartType.bar, data: [{ name: spec.series[0].name, labels: spec.x, values: spec.series[0].data }], opts: Object.assign({}, base, { barDir: 'col' }) };
+      case 'hbar': case 'funnel':
+        return { type: pptx.ChartType.bar, data: [{ name: (spec.series && spec.series[0].name) || 'Value', labels: spec.x || spec.labels, values: (spec.series && spec.series[0].data) || spec.data }], opts: Object.assign({}, base, { barDir: 'bar' }) };
+      case 'stacked':
+        return { type: pptx.ChartType.bar, data: spec.series.map(function (s) { return { name: s.name, labels: spec.x, values: s.data }; }), opts: Object.assign({}, base, { barDir: 'col', barGrouping: 'stacked', showLegend: true }) };
+      case 'donut':
+        return { type: pptx.ChartType.doughnut, data: [{ name: spec.title, labels: spec.labels, values: spec.data.map(function (v) { return Math.abs(v) || 0; }) }], opts: Object.assign({}, base, { showLegend: true, holeSize: 60 }) };
+      case 'radar':
+        return { type: pptx.ChartType.radar, data: spec.series.map(function (s) { return { name: s.name, labels: spec.indicators.map(function (i) { return i.name; }), values: s.data }; }), opts: Object.assign({}, base, { showLegend: true }) };
+      default: return null; // sankey/gantt/treemap/heatmap/gauge/bubble/scatter/waterfall/riskmatrix
+    }
+  }
+
   function exportPPT() {
-    var node = document.getElementById('dashboard');
     if (!state.analysis) { toast('Nothing to export'); return; }
-    if (typeof PptxGenJS === 'undefined' || typeof htmlToImage === 'undefined') { toast('PPTX library not loaded'); return; }
-    toast('Building PowerPoint…');
-    var bg = getComputedStyle(document.documentElement).getPropertyValue('--surface').trim() || '#fff';
+    if (typeof PptxGenJS === 'undefined') { toast('PowerPoint library not loaded'); return; }
+    toast('Building editable PowerPoint…');
+    var a = state.analysis;
     var pptx = new PptxGenJS();
     pptx.defineLayout({ name: 'VIS', width: 13.33, height: 7.5 });
     pptx.layout = 'VIS';
-    var a = state.analysis;
-    var title = document.getElementById('dashTitle').value || 'Executive Dashboard';
+    var title = document.getElementById('dashTitle').value || a.title || 'Executive Dashboard';
 
-    // Slide 1 — title
+    // Slide 1 — title (uses AI headline/tagline when available)
     var s1 = pptx.addSlide(); s1.background = { color: 'FFFFFF' };
-    s1.addText('VISUAL INTELLIGENCE STUDIO', { x: 0.8, y: 2.4, fontSize: 12, color: '8892A6', bold: true, charSpacing: 2 });
-    s1.addText(title, { x: 0.8, y: 2.8, w: 11.7, fontSize: 40, bold: true, color: '0B1220' });
-    s1.addText(a.meta.rows + ' records · ' + a.meta.measures + ' measures · ' + new Date(a.meta.generatedAt).toLocaleDateString(), { x: 0.8, y: 4.0, fontSize: 14, color: '64748B' });
+    s1.addText((a.aiEnhanced ? 'AI-POLISHED BRIEFING' : 'VISUAL INTELLIGENCE STUDIO'), { x: 0.8, y: 2.2, fontSize: 12, color: '8892A6', bold: true, charSpacing: 2 });
+    s1.addText(a.headline || title, { x: 0.8, y: 2.6, w: 11.7, fontSize: 40, bold: true, color: '0B1220' });
+    if (a.tagline) s1.addText(a.tagline, { x: 0.8, y: 3.7, w: 11.7, fontSize: 18, color: '334155' });
+    s1.addText(a.meta.rows + ' records · ' + a.meta.measures + ' measures · ' + new Date(a.meta.generatedAt).toLocaleDateString(), { x: 0.8, y: 4.5, fontSize: 13, color: '64748B' });
 
-    // Slide 2 — KPIs
+    // Slide 2 — KPIs (editable text boxes)
     var s2 = pptx.addSlide();
     s2.addText('Key Metrics', { x: 0.6, y: 0.4, fontSize: 24, bold: true, color: '0B1220' });
     a.kpis.slice(0, 6).forEach(function (k, i) {
@@ -404,29 +429,28 @@
       if (k.delta != null) s2.addText((k.delta >= 0 ? '▲ ' : '▼ ') + VIS.engine.fmtSigned(k.delta), { x: x + 0.25, y: y + 1.55, fontSize: 13, color: k.delta >= 0 ? '16A34A' : 'DC2626', bold: true });
     });
 
-    // Slide 3 — dashboard image
-    htmlToImage.toPng(node, { pixelRatio: 2, backgroundColor: bg, cacheBust: true }).then(function (dataUrl) {
-      var img = new Image();
-      img.onload = function () {
-        var s3 = pptx.addSlide();
-        s3.addText('Dashboard', { x: 0.6, y: 0.3, fontSize: 20, bold: true, color: '0B1220' });
-        var ratio = img.width / img.height;
-        var maxW = 12.1, maxH = 6.2;
-        var w = maxW, h = w / ratio; if (h > maxH) { h = maxH; w = h * ratio; }
-        s3.addImage({ data: dataUrl, x: (13.33 - w) / 2, y: 0.9, w: w, h: h });
+    // One slide per chart that has a NATIVE (editable) PowerPoint equivalent
+    var native = 0;
+    a.charts.forEach(function (spec) {
+      var m = pptMapChart(pptx, spec);
+      if (!m) return;
+      var s = pptx.addSlide();
+      s.addText(spec.title, { x: 0.6, y: 0.4, fontSize: 22, bold: true, color: '0B1220' });
+      try { s.addChart(m.type, m.data, m.opts); native++; } catch (e) { console.warn('[VIS pptx]', spec.kind, e); }
+    });
 
-        // Summary slide
-        var s4 = pptx.addSlide();
-        s4.addText('Executive Summary', { x: 0.6, y: 0.4, fontSize: 24, bold: true, color: '0B1220' });
-        s4.addText(a.summary.replace(/<[^>]+>/g, ''), { x: 0.6, y: 1.3, w: 12.1, h: 3, fontSize: 18, color: '334155', lineSpacingMultiple: 1.3 });
-        if (a.recommendations && a.recommendations.length) {
-          s4.addText('Recommendations', { x: 0.6, y: 4.4, fontSize: 16, bold: true, color: '0B1220' });
-          s4.addText(a.recommendations.map(function (r) { return { text: r, options: { bullet: true } }; }), { x: 0.8, y: 4.9, w: 12, fontSize: 14, color: '334155' });
-        }
-        pptx.writeFile({ fileName: filename('pptx') }).then(function () { toast('PowerPoint downloaded'); });
-      };
-      img.src = dataUrl;
-    }).catch(function (e) { console.error(e); toast('PPTX export failed'); });
+    // Summary + recommendations (editable text)
+    var s4 = pptx.addSlide();
+    s4.addText('Executive Summary', { x: 0.6, y: 0.4, fontSize: 24, bold: true, color: '0B1220' });
+    s4.addText((a.summary || '').replace(/<[^>]+>/g, ''), { x: 0.6, y: 1.3, w: 12.1, h: 2.8, fontSize: 18, color: '334155', lineSpacingMultiple: 1.3 });
+    if (a.recommendations && a.recommendations.length) {
+      s4.addText('Recommendations', { x: 0.6, y: 4.3, fontSize: 16, bold: true, color: '0B1220' });
+      s4.addText(a.recommendations.map(function (r) { return { text: r, options: { bullet: true } }; }), { x: 0.8, y: 4.8, w: 12, fontSize: 14, color: '334155' });
+    }
+
+    pptx.writeFile({ fileName: filename('pptx') }).then(function () {
+      toast('Editable PowerPoint downloaded' + (native ? ' · ' + native + ' native charts' : ''));
+    }).catch(function (e) { console.error(e); toast('PowerPoint export failed'); });
   }
   function escHtml(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
   function escAttr(s) { return String(s).replace(/"/g, '&quot;'); }

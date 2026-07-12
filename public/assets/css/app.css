@@ -801,3 +801,19 @@ table.data td.num { text-align:right; font-variant-numeric: tabular-nums; }
 .skip-link { position:absolute; left:12px; top:-60px; z-index:200; background:var(--accent); color:#fff;
   padding:10px 16px; border-radius:10px; font-size:13px; font-weight:600; transition:top .2s; }
 .skip-link:focus { top:12px; outline:2px solid #fff; outline-offset:2px; }
+
+
+/* Per-chart copy-as-image button */
+.card-head-actions { display:flex; align-items:center; gap:8px; }
+.card-copy { width:28px; height:28px; border-radius:8px; display:grid; place-items:center; color:var(--text-3);
+  border:1px solid transparent; transition:background .15s, color .15s; }
+.card-copy:hover { color:var(--accent); background:var(--accent-soft); }
+.card-copy.copied { color:var(--pos); background:color-mix(in srgb, var(--pos) 14%, transparent); }
+.card-copy [data-ic] { width:15px; height:15px; }
+
+
+/* Presentation KPI icons */
+.s-kpi { position: relative; }
+.s-kpi-ic { width: 40px; height: 40px; border-radius: 11px; display: grid; place-items: center; margin-bottom: 12px;
+  color: var(--accent); background: var(--accent-soft); }
+.s-kpi-ic [data-ic] { width: 22px; height: 22px; }
