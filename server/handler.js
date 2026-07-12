@@ -118,7 +118,18 @@ function parseCookies(req) {
   (req.headers.cookie || '').split(';').forEach(p => { const i = p.indexOf('='); if (i > -1) out[p.slice(0, i).trim()] = decodeURIComponent(p.slice(i + 1).trim()); });
   return out;
 }
-function isAdmin(req) { return validToken(parseCookies(req).vis_admin); }
+// Admin token supplied via header (X-Admin-Token or Authorization: Bearer) — the
+// primary, cookie-independent auth path (robust on serverless / Vercel).
+function headerAdminToken(req) {
+  var h = req.headers['x-admin-token'] || '';
+  if (!h && req.headers['authorization']) { var m = /^Bearer\s+(.+)$/i.exec(req.headers['authorization']); if (m) h = m[1]; }
+  return String(h || '').trim();
+}
+function isAdmin(req) {
+  var hdr = headerAdminToken(req);
+  if (hdr && hdr === String(config.adminToken == null ? '' : config.adminToken).trim()) return true;
+  return validToken(parseCookies(req).vis_admin); // fallback: signed cookie
+}
 
 /* ----------------------------- helpers ----------------------------- */
 function sendJSON(res, status, obj, headers) {

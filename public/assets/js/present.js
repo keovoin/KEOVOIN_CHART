@@ -34,7 +34,7 @@
     var kpiCards = analysis.kpis.slice(0, 6).map(function (k) {
       var d = k.delta;
       var deltaHtml = d != null ? '<div class="s-kpi-delta ' + (d >= 0 ? 'up' : 'down') + '">' + (d >= 0 ? '\u25B2' : '\u25BC') + ' ' + VIS.engine.fmtSigned(d) + '</div>' : '';
-      return '<div class="s-kpi"><div class="s-kpi-label">' + esc(k.label) + '</div><div class="s-kpi-value">' + k.formatted + '</div>' + deltaHtml + '</div>';
+      return '<div class="s-kpi"><div class="s-kpi-ic" data-ic="' + (k.icon || 'chart') + '"></div><div class="s-kpi-label">' + esc(k.label) + '</div><div class="s-kpi-value">' + k.formatted + '</div>' + deltaHtml + '</div>';
     }).join('');
     slidesWrap.appendChild(slide('metrics', '<h2 class="s-h2">Key Metrics</h2><div class="s-kpi-grid">' + kpiCards + '</div>'));
 
