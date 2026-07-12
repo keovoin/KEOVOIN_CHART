@@ -277,6 +277,23 @@
         yAxis: { type: 'value', name: spec.yName, nameTextStyle: { color: c.text3, fontSize: 11 }, splitLine: splitLine(c), axisLabel: axisLabel(c) },
         series: [{ type: 'scatter', symbolSize: function (d) { return 12 + (d[2] / maxS) * 44; }, data: spec.points, itemStyle: { color: pal[0], opacity: 0.6, borderColor: '#fff', borderWidth: 1 }, animationDuration: anim ? 800 : 0 }]
       };
+    },
+
+    riskmatrix: function (spec, c, pal, anim) {
+      // points: [x(prob), y(impact), label, severity]
+      return {
+        grid: { left: 8, right: 16, top: 16, bottom: 8, containLabel: true },
+        tooltip: { trigger: 'item', backgroundColor: c.surface, borderColor: c.line, borderWidth: 1, textStyle: { color: c.text, fontSize: 12 }, extraCssText: 'border-radius:12px;padding:10px 12px;', formatter: function (p) { return '<b>' + (p.data[2] || '') + '</b><br/>' + spec.xName + ': ' + p.data[0] + '<br/>' + spec.yName + ': ' + p.data[1]; } },
+        xAxis: { type: 'value', name: spec.xName, min: 0, max: spec.xMax, nameLocation: 'middle', nameGap: 26, nameTextStyle: { color: c.text3, fontSize: 11 }, splitLine: splitLine(c), axisLabel: axisLabel(c) },
+        yAxis: { type: 'value', name: spec.yName, min: 0, max: spec.yMax, nameLocation: 'middle', nameGap: 30, nameTextStyle: { color: c.text3, fontSize: 11 }, splitLine: splitLine(c), axisLabel: axisLabel(c) },
+        visualMap: { show: false, dimension: 3, min: 2, max: (spec.xMax + spec.yMax), inRange: { color: ['#16a34a', '#eab308', '#dc2626'] } },
+        series: [{
+          type: 'scatter', symbolSize: 24, data: spec.points,
+          label: { show: true, formatter: function (p) { return p.data[2]; }, position: 'right', fontSize: 10, color: c.text2 },
+          itemStyle: { opacity: 0.9, borderColor: c.surface, borderWidth: 1.5 },
+          animationDuration: anim ? 700 : 0
+        }]
+      };
     }
   };
 

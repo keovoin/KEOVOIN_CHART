@@ -463,6 +463,21 @@
       }
     }
 
+    // 13. Risk matrix — probability/likelihood vs impact/severity
+    var probCol = measures.find(function (m) { return /probab|likelihood|likely/i.test(m.name); });
+    var impCol = measures.find(function (m) { return /impact|severity|conseq/i.test(m.name); });
+    if (probCol && impCol && !dateCol) {
+      var labelCol = categories[0] || primaryDim;
+      var pts = rows.map(function (r, i) {
+        return [probCol.nums[i], impCol.nums[i], String(labelCol.values[i] || ''), (probCol.nums[i] || 0) + (impCol.nums[i] || 0)];
+      }).filter(function (p) { return !isNaN(p[0]) && !isNaN(p[1]); });
+      if (pts.length) {
+        var xMax = Math.max(10, Math.ceil(Math.max.apply(null, pts.map(function (p) { return p[0]; }))));
+        var yMax = Math.max(10, Math.ceil(Math.max.apply(null, pts.map(function (p) { return p[1]; }))));
+        charts.unshift({ kind: 'riskmatrix', title: 'Risk matrix', role: 'risk', size: 'col-6', icon: 'alert', points: pts, xName: probCol.name, yName: impCol.name, xMax: xMax, yMax: yMax });
+      }
+    }
+
     // Cap to keep the dashboard focused; the trend/comparison chart always leads.
     return charts.slice(0, 6);
   }

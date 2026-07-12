@@ -31,6 +31,8 @@
   <script>window.PptxGenJS||document.write('<scr'+'ipt src="https://cdn.jsdelivr.net/npm/pptxgenjs@3.12.0/dist/pptxgen.bundle.js"><\/scr'+'ipt>');</script>
 </head>
 <body>
+  <a href="#main-content" class="skip-link">Skip to content</a>
+
   <!-- ======================= APP SHELL ======================= -->
   <div id="app">
     <!-- Sidebar -->
@@ -85,7 +87,7 @@
       </header>
 
       <!-- Routed views -->
-      <div class="view-wrap">
+      <div class="view-wrap" id="main-content">
 
         <!-- ============ HOME ============ -->
         <section class="view active" data-view="home">
@@ -133,6 +135,7 @@
                 <button class="chip" data-action="load-sample" data-sample="funnel">Funnel</button>
                 <button class="chip" data-action="load-sample" data-sample="flow">Flow</button>
                 <button class="chip" data-action="load-sample" data-sample="roadmap">Roadmap</button>
+                <button class="chip" data-action="load-sample" data-sample="risk">Risk</button>
               </div>
               <div class="studio-toolbar-right">
                 <button class="btn btn-ghost btn-sm" id="clearBtn"><span data-ic="trash"></span>Clear</button>
@@ -167,11 +170,12 @@ Jun, 81000, 40000, 240"></textarea>
             </div>
             <div class="dash-actions">
               <div class="edit-controls" id="editControls" style="display:none">
-                <button class="icon-btn" id="edUndo" title="Undo" disabled><span data-ic="undo"></span></button>
-                <button class="icon-btn" id="edRedo" title="Redo" disabled><span data-ic="redo"></span></button>
+                <button class="icon-btn" id="edUndo" title="Undo" aria-label="Undo" disabled><span data-ic="undo"></span></button>
+                <button class="icon-btn" id="edRedo" title="Redo" aria-label="Redo" disabled><span data-ic="redo"></span></button>
               </div>
               <button class="btn btn-ghost btn-sm" id="editToggle" title="Edit layout"><span data-ic="edit"></span>Edit</button>
               <button class="btn btn-ghost btn-sm" id="presentBtn"><span data-ic="slides"></span>Present</button>
+              <button class="btn btn-ghost btn-sm" id="saveTeamBtn" style="display:none"><span data-ic="users"></span>Save to team</button>
               <button class="btn btn-ghost btn-sm" id="regenBtn"><span data-ic="refresh"></span>Regenerate</button>
               <div class="export-menu">
                 <button class="btn btn-primary btn-sm" id="exportBtn"><span data-ic="export"></span>Export</button>
@@ -289,6 +293,7 @@ Jun, 81000, 40000, 240"></textarea>
   <script src="assets/js/render.js"></script>
   <script src="assets/js/ai.js"></script>
   <script src="assets/js/history.js"></script>
+  <script src="assets/js/team.js"></script>
   <script src="assets/js/present.js"></script>
   <script src="assets/js/infographic.js"></script>
   <script src="assets/js/editor.js"></script>

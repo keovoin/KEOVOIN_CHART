@@ -41,7 +41,7 @@ h1,h2,h3,h4 { line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; font
 
   --text: #0b1220;
   --text-2: #475569;
-  --text-3: #94a3b8;
+  --text-3: #64748b;   /* darkened for WCAG AA contrast on light surfaces */
 
   --pos: #16a34a;
   --neg: #dc2626;
@@ -79,8 +79,8 @@ h1,h2,h3,h4 { line-height: 1.15; font-weight: 700; letter-spacing: -0.02em; font
   --card-border: rgba(255,255,255,.08);
   --card-shadow: 0 1px 2px rgba(0,0,0,.4), 0 18px 42px -16px rgba(0,0,0,.6);
   --text: #f2f5fa;
-  --text-2: #a7b0c0;
-  --text-3: #6b7688;
+  --text-2: #b6bfce;
+  --text-3: #8b95a7;   /* lightened for WCAG AA contrast on dark surfaces */
   --line: rgba(255,255,255,.09);
 }
 
@@ -777,3 +777,27 @@ table.data td.num { text-align:right; font-variant-numeric: tabular-nums; }
 /* Error state for malformed data */
 .dash-error { grid-column: span 12; text-align: center; padding: 60px 20px; }
 .dash-error .empty-ic { background: color-mix(in srgb, var(--neg) 14%, transparent); color: var(--neg); }
+
+
+/* =========================================================================
+   Progress rings + leaderboard medals
+   ========================================================================= */
+.ring-row { display:flex; flex-wrap:wrap; gap:18px; justify-content:space-around; align-items:flex-start; padding-top:6px; }
+.ring-item { display:flex; flex-direction:column; align-items:center; gap:10px; }
+.ring { position:relative; width:104px; height:104px; border-radius:50%;
+  background: conic-gradient(var(--accent) calc(var(--p) * 3.6deg), var(--surface-2) 0deg); }
+.ring-hole { position:absolute; inset:11px; border-radius:50%; background:var(--surface);
+  display:grid; place-items:center; font-size:22px; font-weight:800; font-variant-numeric:tabular-nums; letter-spacing:-.02em; }
+.ring-label { font-size:12.5px; font-weight:600; color:var(--text-2); text-align:center; max-width:120px; }
+
+/* Leaderboard medals for the top 3 ranking rows */
+.rank-list .rank:nth-child(1) .rank-i { color:#d4af37; }
+.rank-list .rank:nth-child(2) .rank-i { color:#9ca3af; }
+.rank-list .rank:nth-child(3) .rank-i { color:#cd7f32; }
+.rank-list .rank:nth-child(-n+3) .rank-i { font-size:14px; }
+
+
+/* Skip link (keyboard / screen-reader) */
+.skip-link { position:absolute; left:12px; top:-60px; z-index:200; background:var(--accent); color:#fff;
+  padding:10px 16px; border-radius:10px; font-size:13px; font-weight:600; transition:top .2s; }
+.skip-link:focus { top:12px; outline:2px solid #fff; outline-offset:2px; }

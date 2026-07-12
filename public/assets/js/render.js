@@ -131,6 +131,25 @@
     return card;
   }
 
+  /* ---------- Progress rings (percentage measures) ---------- */
+  function renderProgressRings(analysis) {
+    var pct = analysis.measures.filter(function (m) { return m.sub === 'percent'; }).slice(0, 4);
+    if (!pct.length) return null;
+    var card = el('div', 'card col-6');
+    card.appendChild(cardHead('Progress', 'target'));
+    var wrap = el('div', 'ring-row');
+    pct.forEach(function (m) {
+      var raw = (analysis.dateCol && m.last != null) ? m.last : m.avg;
+      var v = Math.max(0, Math.min(100, Math.round(raw)));
+      var ring = el('div', 'ring-item',
+        '<div class="ring" style="--p:' + v + '"><div class="ring-hole">' + v + '%</div></div>' +
+        '<div class="ring-label">' + m.name + '</div>');
+      wrap.appendChild(ring);
+    });
+    card.appendChild(wrap);
+    return card;
+  }
+
   /* ---------- Data table ---------- */
   function renderTable(analysis) {
     var card = el('div', 'card table-card col-12');
@@ -173,7 +192,11 @@
     // 3. Charts
     analysis.charts.forEach(function (spec) { mount.appendChild(renderChart(spec)); });
 
-    // 4. Ranking (categorical)
+    // 4a. Progress rings (percentage measures)
+    var rings = renderProgressRings(analysis);
+    if (rings) mount.appendChild(rings);
+
+    // 4b. Ranking / leaderboard (categorical)
     var rank = renderRanking(analysis);
     if (rank) mount.appendChild(rank);
 
