@@ -821,3 +821,28 @@ table.data td.num { text-align:right; font-variant-numeric: tabular-nums; }
 
 /* Build marker in the sidebar footer */
 .build-tag { margin-top: 10px; font-size: 10.5px; color: var(--text-3); text-align: center; letter-spacing: .02em; }
+
+
+/* =========================================================================
+   THEME CANVAS — distinct page background & surfaces per theme (light mode)
+   so switching themes changes the whole feel, not just the accent colour.
+   Scoped to :not(dark) so dark mode keeps its own palette.
+   ========================================================================= */
+html:not([data-mode="dark"])[data-theme="notion"]   { --bg:#ffffff; --bg-grad:none; --surface:#ffffff; --surface-2:#f6f5f2; --line:rgba(15,23,42,.10); }
+html:not([data-mode="dark"])[data-theme="vercel"]    { --bg:#fafafa; --bg-grad:none; --surface:#ffffff; --surface-2:#f4f4f5; --line:rgba(0,0,0,.12); }
+html:not([data-mode="dark"])[data-theme="corporate"] { --bg:#eef1f5; --bg-grad:none; --surface:#ffffff; --surface-2:#eceff3; }
+html:not([data-mode="dark"])[data-theme="finance"]   { --bg:#eaf0f1; --bg-grad: radial-gradient(900px 480px at 100% 0%, rgba(15,118,110,.10), transparent 55%); --surface:#ffffff; --surface-2:#eef3f4; }
+html:not([data-mode="dark"])[data-theme="material"]  { --bg:#f3f1fb; --bg-grad: radial-gradient(900px 500px at 12% -10%, rgba(103,80,164,.12), transparent 60%); --surface:#fffbff; --surface-2:#f1ecf9; }
+html:not([data-mode="dark"])[data-theme="luxury"]    { --bg:#f6f1e7; --bg-grad: radial-gradient(900px 500px at 15% -10%, rgba(201,162,75,.16), transparent 60%); --surface:#fffdf7; --surface-2:#f1e9d8; --line:rgba(120,90,40,.15); }
+html:not([data-mode="dark"])[data-theme="executive-white"] { --bg:#f4f6fa; --bg-grad: radial-gradient(1000px 520px at 100% 0%, rgba(30,58,138,.08), transparent 55%); --surface:#ffffff; --surface-2:#eef2f8; }
+
+/* Cyber is a dark-neon identity even in light mode */
+html:not([data-mode="dark"])[data-theme="cyber"] {
+  --bg:#080b10; --bg-grad: radial-gradient(900px 520px at 15% -10%, rgba(0,229,255,.12), transparent 60%), radial-gradient(800px 460px at 100% 0%, rgba(57,255,20,.08), transparent 55%);
+  --surface:#10171f; --surface-2:#0c131b; --card:rgba(18,26,36,.72); --card-border:rgba(0,229,255,.20);
+  --text:#e6f1ff; --text-2:#9fb3c8; --text-3:#6b8299; --line:rgba(0,229,255,.14);
+}
+
+/* Footer credit */
+.credit { margin-top: 8px; font-size: 11px; color: var(--text-2); text-align: center; }
+.credit b { color: var(--accent); font-weight: 700; }

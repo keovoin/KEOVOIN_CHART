@@ -101,7 +101,7 @@
         color: pal, grid: { left: 8, right: 24, top: 12, bottom: 8, containLabel: true }, tooltip: Object.assign(tooltip(c), { axisPointer: { type: 'shadow' } }),
         xAxis: { type: 'value', splitLine: splitLine(c), axisLabel: Object.assign({ formatter: function (v) { return fmt(v, spec.series[0].sub); } }, axisLabel(c)) },
         yAxis: { type: 'category', data: pairs.map(function (p) { return p[0]; }), axisLine: { lineStyle: { color: c.line } }, axisTick: { show: false }, axisLabel: axisLabel(c) },
-        series: [{ type: 'bar', data: pairs.map(function (p) { return p[1]; }), barMaxWidth: 22, label: valLabel(c, spec.series[0].sub, 'right'), itemStyle: { borderRadius: [0, 6, 6, 0], color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: pal[1] || pal[0] }, { offset: 1, color: pal[0] }]) }, animationDuration: anim ? 800 : 0 }]
+        series: [{ type: 'bar', data: pairs.map(function (p) { return p[1]; }), barMaxWidth: 22, label: valLabel(c, spec.series[0].sub, 'right'), labelLayout: { hideOverlap: true }, itemStyle: { borderRadius: [0, 6, 6, 0], color: new echarts.graphic.LinearGradient(0, 0, 1, 0, [{ offset: 0, color: pal[1] || pal[0] }, { offset: 1, color: pal[0] }]) }, animationDuration: anim ? 800 : 0 }]
       };
     },
 
@@ -113,8 +113,9 @@
         series: [{
           type: 'pie', radius: ['52%', '74%'], center: ['50%', '44%'], avoidLabelOverlap: true,
           itemStyle: { borderColor: c.surface, borderWidth: 3, borderRadius: 6 },
-          label: { show: labelsOn(), formatter: '{d}%', fontSize: 11, fontWeight: 600, color: c.text2 },
-          labelLine: { show: labelsOn(), length: 8, length2: 8 },
+          label: { show: labelsOn(), formatter: '{d}%', fontSize: 11, fontWeight: 600, color: c.text2, minMargin: 6 },
+          labelLine: { show: labelsOn(), length: 8, length2: 10 },
+          labelLayout: { hideOverlap: true, moveOverlap: 'shiftY' },
           emphasis: { scale: true, scaleSize: 6, label: { show: true, formatter: '{b}\n{d}%', fontSize: 15, fontWeight: 700, color: c.text } },
           data: data, animationType: 'scale', animationDuration: anim ? 800 : 0
         }]
