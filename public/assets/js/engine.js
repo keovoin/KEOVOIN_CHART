@@ -188,6 +188,9 @@
     if (/^(19|20)\d{2}$/.test(s)) return true;
     if (/^\d{4}-\d{1,2}(-\d{1,2})?$/.test(s)) return true;
     if (/^\d{1,2}\/\d{1,2}\/\d{2,4}$/.test(s)) return true;
+    if (/^\d{1,2}-[a-z]{3}-\d{2,4}$/i.test(s)) return true;  // 01-Jul-2026
+    if (/^[a-z]{3,9}\s+\d{1,2},?\s+\d{4}$/i.test(s)) return true;  // July 1, 2026
+    if (/^\d{1,2}\s+[a-z]{3,9}\s+\d{4}$/i.test(s)) return true;  // 1 July 2026
     if (/^week\s*\d+$/i.test(s) || /^w\d+$/i.test(s)) return true;
     return false;
   }
@@ -669,9 +672,17 @@
     function col(name) { if (name == null) return null; return byName[name] || lower[String(name).toLowerCase().trim()] || null; }
     function nums(c) { return c.nums || (c.nums = c.values.map(cleanNumber)); }
 
-    // KPIs
+    // KPIs — AI may provide direct values OR column+agg references
     var kpis = [];
     (plan.kpis || []).forEach(function (k) {
+      // Direct value from AI (for multi-section/messy data where columns don't map cleanly)
+      if (k.value !== undefined && k.value !== null && !k.column) {
+        var val = typeof k.value === 'number' ? k.value : cleanNumber(String(k.value));
+        var sub = k.sub || (/%/.test(String(k.value)) ? 'percent' : /\$/.test(String(k.value)) ? 'currency' : 'number');
+        kpis.push({ label: k.label || 'Metric', value: isNaN(val) ? k.value : val, sub: sub, aggLabel: '', formatted: isNaN(val) ? String(k.value) : fmtNumber(val, sub), delta: k.delta || null, icon: pickKpiIcon(k.label || '', sub), spark: [], showSpark: false, hero: kpis.length === 0 });
+        return;
+      }
+      // Column reference
       var c = col(k.column); if (!c || c.type !== 'number') return;
       var agg = String(k.agg || 'sum').toLowerCase();
       var valid = nums(c).filter(function (x) { return !isNaN(x); });

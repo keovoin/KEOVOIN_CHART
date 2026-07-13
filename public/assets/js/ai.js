@@ -180,29 +180,45 @@
 
   // Ask the model to DESIGN the dashboard (which KPIs / charts / columns) from a
   // compact description of the data. Returns a plan object (or null).
-  function plan(desc, title) {
+  function plan(desc, title, rawText) {
     if (!isEnabled()) return Promise.resolve(null);
     var lines = [];
-    lines.push('You are an expert BI dashboard designer. Design the most insightful executive dashboard for this dataset.');
-    lines.push('Respond with ONLY minified JSON (no prose, no <think>, no markdown), matching:');
-    lines.push('{"title":string,"headline":string,"tagline":string,"kpis":[{"label":string,"column":string,"agg":"sum|avg|last|min|max|count"}],"charts":[{"kind":"line|area|bar|hbar|stacked|donut|scatter|radar","title":string,"dimension":string,"measures":[string]}],"summary":string,"insights":[{"type":"pos|neg|warn|info","text":string}],"recommendations":[string]}');
-    lines.push('Rules: use ONLY the exact column names listed. 3-5 KPIs, 2-4 charts. Use a time or category column as each chart "dimension" and numeric columns as "measures". Prefer line for time series, bar/hbar for categories, donut for share, scatter for relationships. Base the summary/insights on the actual figures.');
+    lines.push('You are an expert BI dashboard designer. Analyze this business data and design the most insightful executive dashboard.');
+    lines.push('The data may come from a MESSY Excel paste with multiple sections, titles, and mixed formatting — YOU must identify the meaningful tables and metrics within it.');
     lines.push('');
-    lines.push('DATASET: ' + (title || 'data') + ' — ' + desc.rows + ' rows');
-    lines.push('COLUMNS:');
-    desc.columns.forEach(function (c) {
-      if (c.type === 'number') lines.push('- "' + c.name + '" (number' + (c.sub && c.sub !== 'number' ? '/' + c.sub : '') + '): min ' + c.min + ', max ' + c.max + ', e.g. ' + (c.sample || []).join(', '));
-      else if (c.type === 'date') lines.push('- "' + c.name + '" (date/time): e.g. ' + (c.sample || []).join(', '));
-      else lines.push('- "' + c.name + '" (category, ' + (c.distinct || '?') + ' distinct): e.g. ' + (c.sample || []).join(', '));
-    });
+    lines.push('Respond with ONLY minified JSON (no prose, no <think>, no markdown). Schema:');
+    lines.push('{"title":string,"headline":string(<=6 words),"tagline":string(<=14 words),"kpis":[{"label":string,"value":number or string,"delta":number or null,"sub":"currency|percent|number"}],"charts":[{"kind":"line|area|bar|hbar|stacked|donut|scatter|radar","title":string,"dimension":string,"measures":[string]}],"summary":string(2-3 sentences),"insights":[{"type":"pos|neg|warn|info","text":string}],"recommendations":[string]}');
+    lines.push('');
+    lines.push('IMPORTANT RULES:');
+    lines.push('- For KPIs: extract the most important 3-6 headline metrics from the data (totals, key rates, savings). Provide the computed "value" directly.');
+    lines.push('- For charts: use the EXACT column names from the PARSED TABLE below. Pick 2-4 charts that tell the most important story.');
+    lines.push('- A time-series with dates MUST get a line/area chart showing the trend over time.');
+    lines.push('- Categories with numeric values MUST get a bar/hbar chart for visual comparison.');
+    lines.push('- If there are percentage breakdowns, include a donut chart.');
+    lines.push('- Write insights based on the actual numbers you can see.');
+    lines.push('');
+    if (desc && desc.columns && desc.columns.length) {
+      lines.push('PARSED TABLE (' + desc.rows + ' rows):');
+      lines.push('Columns:');
+      desc.columns.forEach(function (c) {
+        if (c.type === 'number') lines.push('  "' + c.name + '" (number' + (c.sub ? '/' + c.sub : '') + '): min=' + c.min + ', max=' + c.max + ', e.g. ' + (c.sample || []).slice(0, 4).join(', '));
+        else if (c.type === 'date') lines.push('  "' + c.name + '" (date): e.g. ' + (c.sample || []).slice(0, 4).join(', '));
+        else lines.push('  "' + c.name + '" (category, ' + (c.distinct || '?') + ' distinct): e.g. ' + (c.sample || []).slice(0, 4).join(', '));
+      });
+    }
+    // Send raw text so the AI understands multi-section layouts
+    if (rawText) {
+      lines.push('');
+      lines.push('RAW PASTE (first ~3000 chars — may contain multiple sections/tables):');
+      lines.push(String(rawText).trim().slice(0, 3000));
+    }
     var messages = [
-      { role: 'system', content: 'You are a precise BI dashboard designer that outputs ONLY valid minified JSON. No reasoning, no markdown.' },
+      { role: 'system', content: 'You are a precise BI dashboard designer. Output ONLY valid minified JSON. No reasoning, no markdown. Start with { end with }.' },
       { role: 'user', content: lines.join('\n') }
     ];
-    return complete(messages, { temperature: 0.2, max_tokens: 2000 }).then(function (content) {
+    return complete(messages, { temperature: 0.2, max_tokens: 2500 }).then(function (content) {
       if (!content) return null;
       var p = parseJSONLoose(content);
-      // basic validity: must have at least kpis or charts
       if (p && ((p.kpis && p.kpis.length) || (p.charts && p.charts.length))) return p;
       return null;
     });
