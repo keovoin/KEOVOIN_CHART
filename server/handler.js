@@ -25,7 +25,7 @@ const CONFIG_PATH = path.join(__dirname, 'config.json');
 const EXAMPLE_PATH = path.join(__dirname, 'config.example.json');
 
 // Build marker — lets you confirm which version a deployment is actually serving.
-const BUILD = 'v17 · 2026-07-12';
+const BUILD = 'v18 · 2026-07-12';
 
 // Serverless platforms (e.g. Vercel) have a read-only filesystem.
 let PERSISTENT = !process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME;
@@ -211,13 +211,16 @@ function providerCall(body, cb) {
   preq.on('error', function (e) { cb({ error: 'AI provider error: ' + e.message, url: endpoint }); });
   preq.write(payload); preq.end();
 }
-// Pull the assistant text out of a chat-completions object (message / text / delta).
+// Pull the assistant text out of a chat-completions object. Prefers non-empty
+// content; falls back to reasoning_content (DeepSeek-style reasoning models).
 function extractMsg(o) {
   var ch = o && o.choices && o.choices[0];
   if (!ch) return null;
-  if (ch.message && typeof ch.message.content === 'string') return ch.message.content;
-  if (typeof ch.text === 'string') return ch.text;
-  if (ch.delta && typeof ch.delta.content === 'string') return ch.delta.content;
+  var m = ch.message || ch.delta || {};
+  if (typeof m.content === 'string' && m.content !== '') return m.content;
+  if (typeof ch.text === 'string' && ch.text !== '') return ch.text;
+  if (typeof m.reasoning_content === 'string' && m.reasoning_content !== '') return m.reasoning_content;
+  if (typeof m.content === 'string') return m.content; // may be empty
   return null;
 }
 // Normalize a provider response (plain JSON OR SSE event-stream) into {content, obj}.
@@ -226,7 +229,7 @@ function parseCompletion(raw) {
   var txt = String(raw).trim();
   try { var o = JSON.parse(txt); var c = extractMsg(o); if (c != null) return { content: c, obj: o }; } catch (e) {}
   if (txt.indexOf('data:') !== -1) {                 // Server-Sent Events stream
-    var content = '', lastObj = null, lines = txt.split(/\r?\n/);
+    var content = '', reasoning = '', lastObj = null, lines = txt.split(/\r?\n/);
     for (var i = 0; i < lines.length; i++) {
       var ln = lines[i].trim();
       if (ln.indexOf('data:') !== 0) continue;
@@ -235,13 +238,15 @@ function parseCompletion(raw) {
       try {
         var obj = JSON.parse(p); lastObj = obj;
         var ch = obj.choices && obj.choices[0];
-        if (ch) {
-          if (ch.delta && typeof ch.delta.content === 'string') content += ch.delta.content;
-          else if (ch.message && typeof ch.message.content === 'string') content += ch.message.content;
+        var d = ch && (ch.delta || ch.message);
+        if (d) {
+          if (typeof d.content === 'string') content += d.content;
+          if (typeof d.reasoning_content === 'string') reasoning += d.reasoning_content;
         }
       } catch (e) {}
     }
     if (content) return { content: content, obj: lastObj };
+    if (reasoning) return { content: reasoning, obj: lastObj };
     if (lastObj) { var c2 = extractMsg(lastObj); if (c2 != null) return { content: c2, obj: lastObj }; }
   }
   return null;
@@ -302,7 +307,7 @@ async function handleRequest(req, res) {
       if (pathname === '/api/ai/diagnose' && req.method === 'POST') {
         if (!isAdmin(req)) return sendJSON(res, 401, { error: 'Not authenticated' });
         if (!config.ai.enabled || !config.ai.endpoint || !config.ai.apiKey) return sendJSON(res, 200, { ok: false, reason: 'AI not configured (set endpoint + key)' });
-        return providerCall({ messages: [{ role: 'user', content: 'Reply with the single word OK.' }], max_tokens: 16 }, function (err, r) {
+        return providerCall({ messages: [{ role: 'user', content: 'Reply with the single word OK.' }], max_tokens: 200 }, function (err, r) {
           if (err) return sendJSON(res, 200, { ok: false, url: err.url, error: err.error });
           var parsed = parseCompletion(r.raw);
           var providerError; try { var o = JSON.parse(String(r.raw).trim()); if (o && o.error) providerError = o.error; } catch (e) {}
