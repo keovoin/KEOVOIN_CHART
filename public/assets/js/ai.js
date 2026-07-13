@@ -100,11 +100,24 @@
   function enhance(analysis) {
     if (!isEnabled()) return Promise.resolve(null);
     var messages = [
-      { role: 'system', content: 'You are a precise executive analyst that outputs only valid JSON.' },
+      { role: 'system', content: 'You are a precise executive analyst. Respond with ONLY minified JSON matching the requested schema. Do NOT include reasoning, thinking, explanations, markdown, or any text before or after the JSON. Start your reply with { and end with }.' },
       { role: 'user', content: buildPrompt(analysis) }
     ];
-    return complete(messages, { temperature: 0.4, max_tokens: 2000 }).then(function (content) {
-      return content ? parseModelJSON(content) : null;
+    return complete(messages, { temperature: 0.3, max_tokens: 2000 }).then(function (content) {
+      if (!content) return null;
+      var parsed = parseModelJSON(content);
+      if (parsed && (parsed.summary || (parsed.insights && parsed.insights.length) || (parsed.recommendations && parsed.recommendations.length))) return parsed;
+      // Salvage: model returned prose (or reasoning) instead of clean JSON — still use it
+      // as the executive summary so AI visibly contributes rather than fully falling back.
+      var prose = String(content)
+        .replace(/```[\s\S]*?```/g, ' ')
+        .replace(/^[\s\S]*?\{[\s\S]*\}\s*$/, function (m) { return m; }) // keep as-is if JSON-ish
+        .replace(/[{}\[\]"`]/g, ' ')
+        .replace(/\b(summary|insights|recommendations|headline|tagline|type|text|pos|neg|warn|info)\b\s*:/gi, ' ')
+        .replace(/\s+/g, ' ')
+        .trim();
+      if (prose.length > 60) return { summary: prose.slice(0, 700), aiPartial: true };
+      return null;
     });
   }
 
