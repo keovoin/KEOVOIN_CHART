@@ -107,7 +107,7 @@
       setPolishing(true);
       toast('AI is analysing your data…');
       var desc = null; try { desc = VIS.engine.describe(table); } catch (e) {}
-      state.enhancePromise = VIS.ai.plan(desc, title || document.getElementById('dashTitle').value).then(function (plan) {
+      state.enhancePromise = VIS.ai.plan(desc, title || document.getElementById('dashTitle').value, text).then(function (plan) {
         setPolishing(false);
         var analysis;
         try { analysis = plan ? VIS.engine.buildFromPlan(table, plan, engOpts) : VIS.engine.analyze(table, engOpts); }
