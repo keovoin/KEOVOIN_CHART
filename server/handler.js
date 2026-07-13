@@ -25,7 +25,7 @@ const CONFIG_PATH = path.join(__dirname, 'config.json');
 const EXAMPLE_PATH = path.join(__dirname, 'config.example.json');
 
 // Build marker — lets you confirm which version a deployment is actually serving.
-const BUILD = 'v16 · 2026-07-12';
+const BUILD = 'v17 · 2026-07-12';
 
 // Serverless platforms (e.g. Vercel) have a read-only filesystem.
 let PERSISTENT = !process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME;
@@ -191,7 +191,8 @@ function providerCall(body, cb) {
     model: body.model || config.ai.model || 'gpt-4o-mini',
     messages: body.messages,
     temperature: typeof body.temperature === 'number' ? body.temperature : 0.4,
-    max_tokens: body.max_tokens || 700
+    max_tokens: body.max_tokens || 700,
+    stream: false
   });
   var lib = target.protocol === 'http:' ? http : https;
   var opts = {
@@ -210,6 +211,41 @@ function providerCall(body, cb) {
   preq.on('error', function (e) { cb({ error: 'AI provider error: ' + e.message, url: endpoint }); });
   preq.write(payload); preq.end();
 }
+// Pull the assistant text out of a chat-completions object (message / text / delta).
+function extractMsg(o) {
+  var ch = o && o.choices && o.choices[0];
+  if (!ch) return null;
+  if (ch.message && typeof ch.message.content === 'string') return ch.message.content;
+  if (typeof ch.text === 'string') return ch.text;
+  if (ch.delta && typeof ch.delta.content === 'string') return ch.delta.content;
+  return null;
+}
+// Normalize a provider response (plain JSON OR SSE event-stream) into {content, obj}.
+function parseCompletion(raw) {
+  if (!raw) return null;
+  var txt = String(raw).trim();
+  try { var o = JSON.parse(txt); var c = extractMsg(o); if (c != null) return { content: c, obj: o }; } catch (e) {}
+  if (txt.indexOf('data:') !== -1) {                 // Server-Sent Events stream
+    var content = '', lastObj = null, lines = txt.split(/\r?\n/);
+    for (var i = 0; i < lines.length; i++) {
+      var ln = lines[i].trim();
+      if (ln.indexOf('data:') !== 0) continue;
+      var p = ln.slice(5).trim();
+      if (!p || p === '[DONE]') continue;
+      try {
+        var obj = JSON.parse(p); lastObj = obj;
+        var ch = obj.choices && obj.choices[0];
+        if (ch) {
+          if (ch.delta && typeof ch.delta.content === 'string') content += ch.delta.content;
+          else if (ch.message && typeof ch.message.content === 'string') content += ch.message.content;
+        }
+      } catch (e) {}
+    }
+    if (content) return { content: content, obj: lastObj };
+    if (lastObj) { var c2 = extractMsg(lastObj); if (c2 != null) return { content: c2, obj: lastObj }; }
+  }
+  return null;
+}
 function aiProxy(req, res, body) {
   if (!config.ai.enabled || !config.ai.endpoint || !config.ai.apiKey) {
     return sendJSON(res, 503, { error: 'AI is not configured. An admin can set it up in the admin portal (or via environment variables on serverless hosts).' });
@@ -217,6 +253,12 @@ function aiProxy(req, res, body) {
   if (!body || !Array.isArray(body.messages)) return sendJSON(res, 400, { error: 'messages[] required' });
   providerCall(body, function (err, r) {
     if (err) return sendJSON(res, 502, { error: err.error });
+    var parsed = parseCompletion(r.raw);
+    if (parsed && parsed.content != null) {
+      // Return a normalized OpenAI-shaped response the frontend always understands.
+      return sendJSON(res, 200, { choices: [{ index: 0, message: { role: 'assistant', content: parsed.content } }] });
+    }
+    // Couldn't normalize — pass the provider's raw response through as-is.
     res.writeHead(r.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
     res.end(r.raw || '{}');
   });
@@ -260,15 +302,14 @@ async function handleRequest(req, res) {
       if (pathname === '/api/ai/diagnose' && req.method === 'POST') {
         if (!isAdmin(req)) return sendJSON(res, 401, { error: 'Not authenticated' });
         if (!config.ai.enabled || !config.ai.endpoint || !config.ai.apiKey) return sendJSON(res, 200, { ok: false, reason: 'AI not configured (set endpoint + key)' });
-        return providerCall({ messages: [{ role: 'user', content: 'Reply with the single word OK.' }], max_tokens: 5 }, function (err, r) {
+        return providerCall({ messages: [{ role: 'user', content: 'Reply with the single word OK.' }], max_tokens: 16 }, function (err, r) {
           if (err) return sendJSON(res, 200, { ok: false, url: err.url, error: err.error });
-          var parsed = null, hasChoices = false, reply = null;
-          try { parsed = JSON.parse(r.raw); } catch (e) {}
-          if (parsed && parsed.choices && parsed.choices.length) { hasChoices = true; var c = parsed.choices[0]; reply = c.message ? c.message.content : c.text; }
+          var parsed = parseCompletion(r.raw);
+          var providerError; try { var o = JSON.parse(String(r.raw).trim()); if (o && o.error) providerError = o.error; } catch (e) {}
           return sendJSON(res, 200, {
-            ok: hasChoices, url: r.url, status: r.status, contentType: r.contentType,
-            model: config.ai.model || '(default)', reply: reply,
-            providerError: parsed && parsed.error ? parsed.error : undefined,
+            ok: !!(parsed && parsed.content != null), url: r.url, status: r.status, contentType: r.contentType,
+            model: config.ai.model || '(default)', reply: parsed ? parsed.content : null,
+            providerError: providerError,
             rawSnippet: String(r.raw || '').slice(0, 400)
           });
         });
