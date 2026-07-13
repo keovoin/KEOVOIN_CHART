@@ -109,6 +109,15 @@
 
   function enhance(analysis) {
     if (!isEnabled()) return Promise.resolve(null);
+    // Rotating multi-model bundle: if the first draw returns junk (a weak/free
+    // model), retry once — the next call re-rotates and often lands cleaner.
+    return attemptEnhance(analysis).then(function (res) {
+      if (res && (res.summary || (res.insights && res.insights.length) || (res.recommendations && res.recommendations.length))) return res;
+      return attemptEnhance(analysis);
+    });
+  }
+
+  function attemptEnhance(analysis) {
     var messages = [
       { role: 'system', content: 'You are a precise executive analyst. Respond with ONLY minified JSON matching the requested schema. Do NOT include reasoning, thinking, explanations, markdown, or any text before or after the JSON. Start your reply with { and end with }.' },
       { role: 'user', content: buildPrompt(analysis) }
