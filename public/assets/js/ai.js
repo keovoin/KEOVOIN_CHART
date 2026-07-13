@@ -75,9 +75,19 @@
       .catch(function (e) { clearTimeout(t); console.warn('[VIS AI browser]', e.message); return null; });
   }
 
+  // Remove reasoning wrappers that GLM / DeepSeek / Nemotron etc. emit.
+  function stripThink(s) {
+    var out = String(s)
+      .replace(/<think>[\s\S]*?<\/think>/gi, '')
+      .replace(/<thinking>[\s\S]*?<\/thinking>/gi, '')
+      .replace(/<\|?reasoning\|?>[\s\S]*?<\/?\|?reasoning\|?>/gi, '')
+      .trim();
+    return out || String(s); // if stripping left nothing, keep original
+  }
   function extractContent(data) {
-    var c = data && data.choices && data.choices[0] && (data.choices[0].message ? data.choices[0].message.content : data.choices[0].text);
-    return c ? String(c) : null;
+    var ch = data && data.choices && data.choices[0];
+    var c = ch && (ch.message ? (ch.message.content || ch.message.reasoning_content) : ch.text);
+    return c ? stripThink(c) : null;
   }
 
   /* ---- enhance the analysis narrative ---- */
@@ -109,9 +119,8 @@
       if (parsed && (parsed.summary || (parsed.insights && parsed.insights.length) || (parsed.recommendations && parsed.recommendations.length))) return parsed;
       // Salvage: model returned prose (or reasoning) instead of clean JSON — still use it
       // as the executive summary so AI visibly contributes rather than fully falling back.
-      var prose = String(content)
+      var prose = stripThink(content)
         .replace(/```[\s\S]*?```/g, ' ')
-        .replace(/^[\s\S]*?\{[\s\S]*\}\s*$/, function (m) { return m; }) // keep as-is if JSON-ish
         .replace(/[{}\[\]"`]/g, ' ')
         .replace(/\b(summary|insights|recommendations|headline|tagline|type|text|pos|neg|warn|info)\b\s*:/gi, ' ')
         .replace(/\s+/g, ' ')
@@ -121,12 +130,27 @@
     });
   }
 
+  // Find the first balanced {...} object in arbitrary text (handles reasoning
+  // models that surround the JSON with prose / <think> blocks).
+  function extractJSONObject(txt) {
+    try { return JSON.parse(txt); } catch (e) {}
+    var start = txt.indexOf('{');
+    if (start < 0) return null;
+    var depth = 0, inStr = false, esc = false;
+    for (var i = start; i < txt.length; i++) {
+      var ch = txt[i];
+      if (inStr) { if (esc) esc = false; else if (ch === '\\') esc = true; else if (ch === '"') inStr = false; }
+      else if (ch === '"') inStr = true;
+      else if (ch === '{') depth++;
+      else if (ch === '}') { depth--; if (depth === 0) { try { return JSON.parse(txt.slice(start, i + 1)); } catch (e) { return null; } } }
+    }
+    return null;
+  }
+
   function parseModelJSON(content) {
-    var txt = String(content).trim().replace(/^```(json)?/i, '').replace(/```$/, '').trim();
-    var s = txt.indexOf('{'), e = txt.lastIndexOf('}');
-    if (s !== -1 && e !== -1) txt = txt.slice(s, e + 1);
+    var txt = stripThink(content).replace(/^```(json)?/i, '').replace(/```\s*$/, '').trim();
     try {
-      var obj = JSON.parse(txt); var out = {};
+      var obj = extractJSONObject(txt); if (!obj) throw new Error('no json'); var out = {};
       if (typeof obj.headline === 'string') out.headline = obj.headline.trim();
       if (typeof obj.tagline === 'string') out.tagline = obj.tagline.trim();
       if (typeof obj.summary === 'string') out.summary = obj.summary;
