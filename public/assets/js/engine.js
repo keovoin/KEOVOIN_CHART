@@ -20,8 +20,9 @@
     return 'csv';
   }
 
-  // RFC-ish CSV line splitter that respects quotes.
+  // RFC-ish line splitter that respects quotes. delim '\t' | ',' | ';' | 'SPACES'.
   function splitDelimited(line, delim) {
+    if (delim === 'SPACES') return line.trim().split(/\s{2,}|\t/).map(function (s) { return s.trim(); });
     var out = [], cur = '', q = false;
     for (var i = 0; i < line.length; i++) {
       var c = line[i];
@@ -36,21 +37,62 @@
       }
     }
     out.push(cur);
-    return out.map(function (s) { return s.trim(); });
+    return out.map(function (s) { return s.trim().replace(/^"|"$/g, ''); });
+  }
+
+  // Pick the delimiter from the first several lines (Excel paste = tabs).
+  function chooseDelim(text) {
+    var sample = text.split(/\r?\n/).slice(0, 12).join('\n');
+    if (sample.indexOf('\t') !== -1) return '\t';
+    var commas = (sample.match(/,/g) || []).length;
+    var semis = (sample.match(/;/g) || []).length;
+    if (semis > commas && semis > 0) return ';';
+    if (commas > 0) return ',';
+    if (/\S {2,}\S/.test(sample)) return 'SPACES';
+    return ',';
   }
 
   function parseDelimited(text, delim) {
-    var lines = text.replace(/\r\n/g, '\n').split('\n').filter(function (l) { return l.trim().length; });
+    var lines = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n').split('\n').filter(function (l) { return l.trim().length; });
     if (!lines.length) return { columns: [], rows: [] };
-    var headers = splitDelimited(lines[0], delim);
+
+    // Header = first line that yields >= 2 non-empty cells (skips title/preamble lines).
+    var headerIdx = 0, best = 0;
+    for (var k = 0; k < Math.min(lines.length, 8); k++) {
+      var n = splitDelimited(lines[k], delim).filter(function (c) { return c !== ''; }).length;
+      if (n > best) { best = n; headerIdx = k; }
+      if (n >= 2 && k === headerIdx) break;
+    }
+    var rawHeaders = splitDelimited(lines[headerIdx], delim);
+    var seen = {};
+    var headers = rawHeaders.map(function (h, i) {
+      var name = (h && h.trim()) ? h.trim() : ('Column ' + (i + 1));
+      if (seen[name] != null) { seen[name]++; name = name + ' (' + seen[name] + ')'; } else seen[name] = 0;
+      return name;
+    });
+
     var rows = [];
-    for (var i = 1; i < lines.length; i++) {
+    for (var i = headerIdx + 1; i < lines.length; i++) {
       var cells = splitDelimited(lines[i], delim);
+      if (!cells.some(function (c) { return c !== ''; })) continue; // skip blank rows
       var obj = {};
       for (var j = 0; j < headers.length; j++) obj[headers[j]] = cells[j] !== undefined ? cells[j] : '';
       rows.push(obj);
     }
     return { columns: headers, rows: rows };
+  }
+
+  // Drop columns that are entirely empty (common with trailing tabs from Excel).
+  function cleanTable(table) {
+    if (!table.columns.length) return table;
+    var keep = table.columns.filter(function (c) {
+      return table.rows.some(function (r) { return String(r[c] == null ? '' : r[c]).trim() !== ''; });
+    });
+    if (keep.length && keep.length < table.columns.length) {
+      table.columns = keep;
+      table.rows = table.rows.map(function (r) { var o = {}; keep.forEach(function (c) { o[c] = r[c]; }); return o; });
+    }
+    return table;
   }
 
   function parseMarkdown(text) {
@@ -103,13 +145,15 @@
   function parse(text) {
     var fmt = detectFormat(text);
     var table;
-    switch (fmt) {
-      case 'json': table = parseJSON(text); break;
-      case 'markdown': table = parseMarkdown(text); break;
-      case 'tsv': table = parseDelimited(text, '\t'); break;
-      case 'empty': table = { columns: [], rows: [] }; break;
-      default: table = parseDelimited(text, ','); break;
+    if (fmt === 'json') table = parseJSON(text);
+    else if (fmt === 'markdown') table = parseMarkdown(text);
+    else if (fmt === 'empty') table = { columns: [], rows: [] };
+    else {
+      var d = chooseDelim(text);
+      table = parseDelimited(text, d);
+      fmt = d === '\t' ? 'tsv' : d === 'SPACES' ? 'text' : (d === ';' ? 'csv' : 'csv');
     }
+    table = cleanTable(table);
     table.format = fmt;
     return table;
   }
@@ -588,11 +632,115 @@
     return { summary: parts.join(' '), recommendations: recs.slice(0, 4) };
   }
 
+  /* ----------------------------- AI plan support ----------------------------- */
+
+  // Compact description of the data for the AI to design a dashboard from.
+  function describe(table) {
+    var cols = table.columns.map(function (name) {
+      var values = table.rows.map(function (r) { return r[name]; });
+      var t = detectColumnType(values);
+      var low = name.toLowerCase();
+      if (t.type === 'number') {
+        if (/(rate|margin|%|percent|share|ratio|util)/.test(low) && t.sub === 'number') t.sub = 'percent';
+        if (/(revenue|sales|cost|expense|profit|budget|price|cash|amount|\$|usd)/.test(low) && t.sub === 'number') t.sub = 'currency';
+      }
+      var d = { name: name, type: t.type, sub: t.sub };
+      if (t.type === 'number') {
+        var nums = values.map(cleanNumber).filter(function (x) { return !isNaN(x); });
+        d.min = nums.length ? Math.min.apply(null, nums) : null;
+        d.max = nums.length ? Math.max.apply(null, nums) : null;
+        d.sample = nums.slice(0, 3);
+      } else {
+        d.sample = values.slice(0, 4).map(String);
+        var uniq = {}; values.forEach(function (v) { if (String(v).trim()) uniq[String(v)] = 1; });
+        d.distinct = Object.keys(uniq).length;
+      }
+      return d;
+    });
+    return { rows: table.rows.length, columns: cols };
+  }
+
+  // Build the analysis object from an AI-designed PLAN. The AI chooses structure
+  // (which KPIs / charts / columns); we compute the real numbers from the data.
+  function buildFromPlan(table, plan, opts) {
+    var base = analyze(table, opts);                 // heuristic base = fallback + column metadata
+    var byName = {}; base.columns.forEach(function (c) { byName[c.name] = c; });
+    var lower = {}; base.columns.forEach(function (c) { lower[c.name.toLowerCase()] = c; });
+    function col(name) { if (name == null) return null; return byName[name] || lower[String(name).toLowerCase().trim()] || null; }
+    function nums(c) { return c.nums || (c.nums = c.values.map(cleanNumber)); }
+
+    // KPIs
+    var kpis = [];
+    (plan.kpis || []).forEach(function (k) {
+      var c = col(k.column); if (!c || c.type !== 'number') return;
+      var agg = String(k.agg || 'sum').toLowerCase();
+      var valid = nums(c).filter(function (x) { return !isNaN(x); });
+      if (!valid.length) return;
+      var val;
+      if (agg === 'avg' || agg === 'average' || agg === 'mean') val = mean(valid);
+      else if (agg === 'last' || agg === 'latest') val = valid[valid.length - 1];
+      else if (agg === 'min') val = Math.min.apply(null, valid);
+      else if (agg === 'max') val = Math.max.apply(null, valid);
+      else if (agg === 'count') val = valid.length;
+      else val = sum(valid);
+      var delta = null;
+      if ((agg === 'last' || agg === 'latest') && valid.length > 1) delta = pctChange(valid[valid.length - 2], valid[valid.length - 1]);
+      else if (base.dateCol && valid.length > 1) delta = pctChange(valid[0], valid[valid.length - 1]);
+      kpis.push({ label: k.label || c.name, value: val, sub: c.sub, aggLabel: agg, formatted: fmtNumber(val, c.sub), delta: delta, icon: pickKpiIcon(c.name, c.sub), spark: valid, showSpark: !!base.dateCol, hero: kpis.length === 0 });
+    });
+    if (!kpis.length) kpis = base.kpis;
+
+    // Charts
+    var charts = [];
+    (plan.charts || []).forEach(function (ch) {
+      var dim = col(ch.dimension);
+      var ms = (ch.measures || []).map(col).filter(function (m) { return m && m.type === 'number'; });
+      if (!ms.length) return;
+      var kind = String(ch.kind || 'bar').toLowerCase();
+      var labels = dim ? dim.values.map(String) : ms[0].values.map(function (_, i) { return String(i + 1); });
+      var title = ch.title || (ms[0].name + (dim ? ' by ' + dim.name : ''));
+      if (kind === 'donut' || kind === 'pie') {
+        charts.push({ kind: 'donut', title: title, role: 'composition', size: 'col-4', icon: 'percent', labels: labels, data: nums(ms[0]), sub: ms[0].sub });
+      } else if (kind === 'scatter' && ms.length >= 2) {
+        var pts = table.rows.map(function (r, i) { return [nums(ms[0])[i], nums(ms[1])[i], String(labels[i] || '')]; }).filter(function (p) { return !isNaN(p[0]) && !isNaN(p[1]); });
+        charts.push({ kind: 'scatter', title: title, role: 'relationship', size: 'col-6', icon: 'target', xName: ms[0].name, yName: ms[1].name, points: pts });
+      } else if (kind === 'radar') {
+        charts.push({ kind: 'radar', title: title, role: 'profile', size: 'col-6', icon: 'target', indicators: ms.map(function (m) { return { name: m.name, max: (m.max || Math.max.apply(null, nums(m).filter(function (x) { return !isNaN(x); })) || 1) * 1.15 }; }), series: labels.slice(0, 5).map(function (lab, i) { return { name: lab, data: ms.map(function (m) { return nums(m)[i]; }) }; }) });
+      } else if (kind === 'hbar') {
+        charts.push({ kind: 'hbar', title: title, role: 'comparison', size: 'col-8', icon: 'chart', x: labels, series: [{ name: ms[0].name, data: nums(ms[0]), sub: ms[0].sub }] });
+      } else if (kind === 'stacked') {
+        charts.push({ kind: 'stacked', title: title, role: 'stacked', size: 'col-6', icon: 'chart', x: labels, series: ms.map(function (m) { return { name: m.name, data: nums(m), sub: m.sub }; }) });
+      } else if (kind === 'line' || kind === 'area') {
+        charts.push({ kind: ms.length > 1 ? 'line' : 'area', title: title, role: 'trend', size: 'col-8', icon: 'trendUp', x: labels, series: ms.slice(0, 4).map(function (m) { return { name: m.name, data: nums(m), sub: m.sub }; }) });
+      } else {
+        charts.push({ kind: 'bar', title: title, role: 'comparison', size: 'col-8', icon: 'chart', x: labels, series: [{ name: ms[0].name, data: nums(ms[0]), sub: ms[0].sub }] });
+      }
+    });
+    if (!charts.length) charts = base.charts;
+    charts = charts.slice(0, 6);
+
+    var insights = (Array.isArray(plan.insights) && plan.insights.length) ? plan.insights.map(function (i) {
+      var type = String(i.type || 'info').toLowerCase();
+      var icon = type === 'pos' ? 'trendUp' : type === 'neg' ? 'trendDown' : type === 'warn' ? 'alert' : 'insight';
+      return { type: ['pos', 'neg', 'warn', 'info'].indexOf(type) !== -1 ? type : 'info', icon: icon, text: String(i.text) };
+    }).slice(0, 6) : base.insights;
+    var recommendations = (Array.isArray(plan.recommendations) && plan.recommendations.length) ? plan.recommendations.map(String).slice(0, 5) : base.recommendations;
+    var summary = (typeof plan.summary === 'string' && plan.summary.trim()) ? plan.summary : base.summary;
+
+    return Object.assign({}, base, {
+      kpis: kpis, charts: charts, insights: insights, recommendations: recommendations, summary: summary,
+      headline: plan.headline || base.headline, tagline: plan.tagline || base.tagline,
+      title: plan.title || base.title, aiEnhanced: true, aiPlanned: true
+    });
+  }
+
   /* ----------------------------- Export ----------------------------- */
   window.VIS.engine = {
     parse: parse,
     detectFormat: detectFormat,
     analyze: analyze,
+    describe: describe,
+    buildFromPlan: buildFromPlan,
     fmtNumber: fmtNumber,
     fmtSigned: fmtSigned,
     cleanNumber: cleanNumber

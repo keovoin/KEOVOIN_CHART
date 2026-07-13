@@ -846,3 +846,8 @@ html:not([data-mode="dark"])[data-theme="cyber"] {
 /* Footer credit */
 .credit { margin-top: 8px; font-size: 11px; color: var(--text-2); text-align: center; }
 .credit b { color: var(--accent); font-weight: 700; }
+
+
+/* Studio paste actions */
+.paste-actions { display: flex; gap: 10px; align-items: center; }
+@media (max-width: 520px) { .paste-actions { width: 100%; } .paste-actions .btn { flex: 1; justify-content: center; } }

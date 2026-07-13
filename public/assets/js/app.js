@@ -90,7 +90,8 @@
   }
 
   /* ---------- generate ---------- */
-  function generate(text, title) {
+  function generate(text, title, opts) {
+    opts = opts || {};
     text = text != null ? text : document.getElementById('dataInput').value;
     if (!text.trim()) { toast('Paste some data first'); route('studio'); return; }
     var table;
@@ -99,58 +100,74 @@
     if (!table.columns.some(function (c) { return c && c.trim(); })) { toast('No column headers found'); route('studio'); return; }
 
     state.lastText = text;
-    var analysis;
-    try {
-      analysis = VIS.engine.analyze(table, { sigma: VIS.settings.sigma, maxKpi: VIS.settings.maxKpi });
-    } catch (e) {
-      console.error('[VIS] analysis failed', e);
-      showDashError('We couldn\u2019t analyze that dataset. Try cleaner column headers or a simpler table.');
-      route('dashboard');
+    var engOpts = { sigma: VIS.settings.sigma, maxKpi: VIS.settings.maxKpi };
+
+    // ---- AI-designed dashboard: the model analyses the data and picks the KPIs/charts ----
+    if (opts.ai && VIS.ai && VIS.ai.isEnabled()) {
+      setPolishing(true);
+      toast('AI is analysing your data…');
+      var desc = null; try { desc = VIS.engine.describe(table); } catch (e) {}
+      state.enhancePromise = VIS.ai.plan(desc, title || document.getElementById('dashTitle').value).then(function (plan) {
+        setPolishing(false);
+        var analysis;
+        try { analysis = plan ? VIS.engine.buildFromPlan(table, plan, engOpts) : VIS.engine.analyze(table, engOpts); }
+        catch (e) { console.error('[VIS] buildFromPlan failed', e); analysis = VIS.engine.analyze(table, engOpts); }
+        finishGenerate(analysis, title, text, plan ? 'AI designed your dashboard' : 'AI unavailable — used built-in analysis');
+      }).catch(function (e) {
+        console.error('[VIS] AI plan failed', e); setPolishing(false);
+        var analysis; try { analysis = VIS.engine.analyze(table, engOpts); } catch (x) { showDashError('We couldn\u2019t analyze that dataset.'); route('dashboard'); return; }
+        finishGenerate(analysis, title, text, 'AI failed — used built-in analysis');
+      });
       return;
     }
-    if (title) analysis.title = title;
-    state.analysis = analysis;
 
-    if (title) document.getElementById('dashTitle').value = title;
-    var meta = analysis.meta;
-    document.getElementById('dashMeta').textContent =
-      meta.rows + ' rows · ' + meta.cols + ' fields · ' + meta.measures + ' measures · ' + meta.format.toUpperCase() +
-      ' · ' + meta.generatedAt.toLocaleString();
+    // ---- Heuristic dashboard (fast) + optional async narrative polish ----
+    var analysis;
+    try { analysis = VIS.engine.analyze(table, engOpts); }
+    catch (e) { console.error('[VIS] analysis failed', e); showDashError('We couldn\u2019t analyze that dataset. Try cleaner column headers or a simpler table.'); route('dashboard'); return; }
+    finishGenerate(analysis, title, text, 'Dashboard generated');
 
-    VIS.editor && VIS.editor.reset();
-    VIS.render(analysis, document.getElementById('dashboard'));
-    VIS.editor && VIS.editor.initBoardDnd();
-    route('dashboard');
-    toast('Dashboard generated');
-
-    // save to history
-    try {
-      VIS.history.save({
-        title: (title || document.getElementById('dashTitle').value || 'Untitled'),
-        dataText: text, theme: document.documentElement.getAttribute('data-theme'),
-        format: meta.format, rows: meta.rows, cols: meta.cols,
-        kpis: analysis.kpis.slice(0, 3).map(function (k) { return { label: k.label, formatted: k.formatted }; })
-      });
-    } catch (e) {}
-
-    // AI polish (async, non-blocking) — applied across ALL views
     state.aiPending = false;
     if (VIS.ai && VIS.ai.isEnabled()) {
-      state.aiPending = true;
-      setPolishing(true);
+      state.aiPending = true; setPolishing(true);
       state.enhancePromise = VIS.ai.enhance(analysis).then(function (res) {
         state.aiPending = false; setPolishing(false);
-        if (!res) { toast('AI unavailable — using built-in analysis'); return; }
+        if (!res) return;
         if (res.headline) analysis.headline = res.headline;
         if (res.tagline) analysis.tagline = res.tagline;
         if (res.summary) analysis.summary = res.summary;
         if (res.insights && res.insights.length) analysis.insights = res.insights;
         if (res.recommendations && res.recommendations.length) analysis.recommendations = res.recommendations;
         analysis.aiEnhanced = true;
-        refreshActiveDataView();   // repaint whichever of dashboard/infographic/presentation is showing
+        refreshActiveDataView();
         toast('Polished with AI');
       }).catch(function () { state.aiPending = false; setPolishing(false); });
     }
+  }
+
+  // Shared: set state, render, route, save to history.
+  function finishGenerate(analysis, title, text, msg) {
+    if (title) analysis.title = title;
+    state.analysis = analysis;
+    var titleInput = document.getElementById('dashTitle');
+    if (analysis.title) titleInput.value = analysis.title;
+    var meta = analysis.meta;
+    document.getElementById('dashMeta').textContent =
+      meta.rows + ' rows · ' + meta.cols + ' fields · ' + meta.measures + ' measures · ' + meta.format.toUpperCase() +
+      (analysis.aiPlanned ? ' · AI-designed' : '') + ' · ' + new Date(meta.generatedAt).toLocaleString();
+    VIS.editor && VIS.editor.reset();
+    VIS.render(analysis, document.getElementById('dashboard'));
+    VIS.editor && VIS.editor.initBoardDnd();
+    route('dashboard');
+    if (msg) toast(msg);
+    try {
+      VIS.history.save({
+        title: (titleInput.value || 'Untitled'),
+        dataText: text, theme: document.documentElement.getAttribute('data-theme'),
+        format: meta.format, rows: meta.rows, cols: meta.cols,
+        kpis: analysis.kpis.slice(0, 3).map(function (k) { return { label: k.label, formatted: k.formatted }; })
+      });
+    } catch (e) {}
   }
 
   /* Rebuild whichever data-driven view is currently active so AI polish shows everywhere. */
@@ -701,6 +718,11 @@
     if (clearHist) clearHist.addEventListener('click', function () { VIS.history.clear(); refreshHistoryViews(); toast('History cleared'); });
 
     document.getElementById('generateBtn').addEventListener('click', function () { generate(); });
+    var aiBuildBtn = document.getElementById('aiBuildBtn');
+    if (aiBuildBtn) aiBuildBtn.addEventListener('click', function () {
+      if (!(VIS.ai && VIS.ai.isEnabled())) { toast('AI isn\u2019t configured — using Quick build. An admin can enable it in /admin.'); generate(); return; }
+      generate(undefined, undefined, { ai: true });
+    });
     document.getElementById('regenBtn').addEventListener('click', function () { if (state.lastText) generate(state.lastText, document.getElementById('dashTitle').value); });
     document.getElementById('clearBtn').addEventListener('click', function () { document.getElementById('dataInput').value = ''; updateDetect(); });
     document.getElementById('dataInput').addEventListener('input', debounce(updateDetect, 200));

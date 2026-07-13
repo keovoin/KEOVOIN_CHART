@@ -173,9 +173,44 @@
     } catch (e) { console.warn('[VIS AI] could not parse model JSON'); return null; }
   }
 
+  function parseJSONLoose(content) {
+    var t = stripThink(content).replace(/^```(json)?/i, '').replace(/```\s*$/, '').trim();
+    return extractJSONObject(t);
+  }
+
+  // Ask the model to DESIGN the dashboard (which KPIs / charts / columns) from a
+  // compact description of the data. Returns a plan object (or null).
+  function plan(desc, title) {
+    if (!isEnabled()) return Promise.resolve(null);
+    var lines = [];
+    lines.push('You are an expert BI dashboard designer. Design the most insightful executive dashboard for this dataset.');
+    lines.push('Respond with ONLY minified JSON (no prose, no <think>, no markdown), matching:');
+    lines.push('{"title":string,"headline":string,"tagline":string,"kpis":[{"label":string,"column":string,"agg":"sum|avg|last|min|max|count"}],"charts":[{"kind":"line|area|bar|hbar|stacked|donut|scatter|radar","title":string,"dimension":string,"measures":[string]}],"summary":string,"insights":[{"type":"pos|neg|warn|info","text":string}],"recommendations":[string]}');
+    lines.push('Rules: use ONLY the exact column names listed. 3-5 KPIs, 2-4 charts. Use a time or category column as each chart "dimension" and numeric columns as "measures". Prefer line for time series, bar/hbar for categories, donut for share, scatter for relationships. Base the summary/insights on the actual figures.');
+    lines.push('');
+    lines.push('DATASET: ' + (title || 'data') + ' — ' + desc.rows + ' rows');
+    lines.push('COLUMNS:');
+    desc.columns.forEach(function (c) {
+      if (c.type === 'number') lines.push('- "' + c.name + '" (number' + (c.sub && c.sub !== 'number' ? '/' + c.sub : '') + '): min ' + c.min + ', max ' + c.max + ', e.g. ' + (c.sample || []).join(', '));
+      else if (c.type === 'date') lines.push('- "' + c.name + '" (date/time): e.g. ' + (c.sample || []).join(', '));
+      else lines.push('- "' + c.name + '" (category, ' + (c.distinct || '?') + ' distinct): e.g. ' + (c.sample || []).join(', '));
+    });
+    var messages = [
+      { role: 'system', content: 'You are a precise BI dashboard designer that outputs ONLY valid minified JSON. No reasoning, no markdown.' },
+      { role: 'user', content: lines.join('\n') }
+    ];
+    return complete(messages, { temperature: 0.2, max_tokens: 2000 }).then(function (content) {
+      if (!content) return null;
+      var p = parseJSONLoose(content);
+      // basic validity: must have at least kpis or charts
+      if (p && ((p.kpis && p.kpis.length) || (p.charts && p.charts.length))) return p;
+      return null;
+    });
+  }
+
   window.VIS.ai = {
     init: init, getConfig: getConfig, setConfig: setConfig,
     isEnabled: isEnabled, backendPresent: backendPresent, backendAvailable: function () { return backend.available; },
-    complete: complete, enhance: enhance
+    complete: complete, enhance: enhance, plan: plan
   };
 })();
