@@ -25,7 +25,7 @@ const CONFIG_PATH = path.join(__dirname, 'config.json');
 const EXAMPLE_PATH = path.join(__dirname, 'config.example.json');
 
 // Build marker — lets you confirm which version a deployment is actually serving.
-const BUILD = 'v20 · 2026-07-12';
+const BUILD = 'v21 · 2026-07-12';
 
 // Serverless platforms (e.g. Vercel) have a read-only filesystem.
 let PERSISTENT = !process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME;
