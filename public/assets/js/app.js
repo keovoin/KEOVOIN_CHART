@@ -391,144 +391,16 @@
       toast('HTML downloaded');
     }).catch(function (e) { console.error(e); toast('HTML export failed'); });
   }
-  function pptPalette() {
-    var raw = getComputedStyle(document.documentElement).getPropertyValue('--chart-palette').trim();
-    return raw.split(',').map(function (s) { return s.trim().replace('#', ''); }).filter(Boolean);
-  }
-  // Map a VIS chart spec to a NATIVE (editable) pptxgenjs chart. Returns null if
-  // the type has no native PowerPoint equivalent (those stay in PNG/PDF export).
-  function pptMapChart(pptx, spec) {
-    var pal = pptPalette();
-    var base = { x: 0.6, y: 1.2, w: 12.1, h: 5.5, chartColors: pal, showLegend: false, legendPos: 'b', showValue: false };
-    switch (spec.kind) {
-      case 'line': case 'area':
-        return { type: pptx.ChartType.line, data: spec.series.map(function (s) { return { name: s.name, labels: spec.x, values: s.data }; }), opts: Object.assign({}, base, { lineSmooth: true, showLegend: spec.series.length > 1 }) };
-      case 'bar':
-        return { type: pptx.ChartType.bar, data: [{ name: spec.series[0].name, labels: spec.x, values: spec.series[0].data }], opts: Object.assign({}, base, { barDir: 'col' }) };
-      case 'hbar': case 'funnel':
-        return { type: pptx.ChartType.bar, data: [{ name: (spec.series && spec.series[0].name) || 'Value', labels: spec.x || spec.labels, values: (spec.series && spec.series[0].data) || spec.data }], opts: Object.assign({}, base, { barDir: 'bar' }) };
-      case 'stacked':
-        return { type: pptx.ChartType.bar, data: spec.series.map(function (s) { return { name: s.name, labels: spec.x, values: s.data }; }), opts: Object.assign({}, base, { barDir: 'col', barGrouping: 'stacked', showLegend: true }) };
-      case 'donut':
-        return { type: pptx.ChartType.doughnut, data: [{ name: spec.title, labels: spec.labels, values: spec.data.map(function (v) { return Math.abs(v) || 0; }) }], opts: Object.assign({}, base, { showLegend: true, holeSize: 60 }) };
-      case 'radar':
-        return { type: pptx.ChartType.radar, data: spec.series.map(function (s) { return { name: s.name, labels: spec.indicators.map(function (i) { return i.name; }), values: s.data }; }), opts: Object.assign({}, base, { showLegend: true }) };
-      default: return null; // sankey/gantt/treemap/heatmap/gauge/bubble/scatter/waterfall/riskmatrix
-    }
-  }
-
-  function pptHex(name, fb) {
-    var v = getComputedStyle(document.documentElement).getPropertyValue(name).trim();
-    if (!v) return fb;
-    if (v.charAt(0) === '#') { v = v.slice(1); if (v.length === 3) v = v.replace(/(.)/g, '$1$1'); return v.toUpperCase(); }
-    var m = v.match(/(\d+)[,\s]+(\d+)[,\s]+(\d+)/);
-    if (m) return [m[1], m[2], m[3]].map(function (n) { var h = (+n).toString(16); return h.length < 2 ? '0' + h : h; }).join('').toUpperCase();
-    return fb;
-  }
-
   function exportPPT() {
     if (!state.analysis) { toast('Nothing to export'); return; }
     if (typeof PptxGenJS === 'undefined') { toast('PowerPoint library not loaded'); return; }
-    toast('Designing PowerPoint…');
-    var a = state.analysis;
+    toast('Designing slides…');
     var pptx = new PptxGenJS();
-    pptx.defineLayout({ name: 'VIS', width: 13.33, height: 7.5 });
-    pptx.layout = 'VIS';
-    var title = document.getElementById('dashTitle').value || a.title || 'Executive Dashboard';
-
-    // Theme colours
-    var AC = pptHex('--accent', '1E3A8A');
-    var AC2 = pptHex('--accent-2', '0E7490');
-    var DARK = '0B1220', MUTED = '64748B', INK = '334155', CARD = 'F5F7FB', WHITE = 'FFFFFF';
-    var pageNo = 0;
-    function footer(s) {
-      pageNo++;
-      s.addText([{ text: 'VIS', options: { bold: true, color: AC } }, { text: '  ·  Created by Keovoin', options: { color: '94A3B8' } }], { x: 0.5, y: 7.08, w: 8, h: 0.32, fontSize: 9 });
-      s.addText(String(pageNo), { x: 12.4, y: 7.08, w: 0.5, h: 0.32, fontSize: 9, color: '94A3B8', align: 'right' });
-    }
-    function band(s, text) {
-      s.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 13.33, h: 0.95, fill: { color: AC }, line: { type: 'none' } });
-      s.addShape(pptx.ShapeType.rect, { x: 0, y: 0.95, w: 13.33, h: 0.06, fill: { color: AC2 }, line: { type: 'none' } });
-      s.addText(text, { x: 0.6, y: 0.2, w: 12, h: 0.6, fontSize: 22, bold: true, color: WHITE, valign: 'middle' });
-    }
-
-    // ---- Slide 1 — designed cover ----
-    var s1 = pptx.addSlide(); s1.background = { color: AC };
-    try { s1.addShape(pptx.ShapeType.ellipse, { x: 9.6, y: -1.6, w: 5.2, h: 5.2, fill: { color: AC2, transparency: 55 }, line: { type: 'none' } }); } catch (e) {}
-    s1.addShape(pptx.ShapeType.rect, { x: 0, y: 6.9, w: 13.33, h: 0.6, fill: { color: AC2 }, line: { type: 'none' } });
-    s1.addText((a.aiEnhanced ? 'AI-POLISHED EXECUTIVE BRIEFING' : 'VISUAL INTELLIGENCE STUDIO'), { x: 0.9, y: 2.15, w: 11, fontSize: 13, color: WHITE, bold: true, charSpacing: 3, transparency: 15 });
-    s1.addText(a.headline || title, { x: 0.9, y: 2.6, w: 11.4, h: 1.7, fontSize: 42, bold: true, color: WHITE });
-    if (a.tagline) s1.addText(a.tagline, { x: 0.9, y: 4.45, w: 10.8, fontSize: 18, color: WHITE, transparency: 8 });
-    s1.addText(a.meta.rows + ' records  ·  ' + a.meta.measures + ' measures  ·  ' + new Date(a.meta.generatedAt).toLocaleDateString(), { x: 0.9, y: 5.5, w: 11, fontSize: 12, color: WHITE, transparency: 30 });
-    s1.addText('Created by Keovoin', { x: 0.9, y: 6.95, w: 6, fontSize: 12, color: WHITE, bold: true, valign: 'middle' });
-
-    // ---- Slide 2 — KPI cards ----
-    var s2 = pptx.addSlide(); s2.background = { color: WHITE };
-    band(s2, 'Key Metrics');
-    a.kpis.slice(0, 6).forEach(function (k, i) {
-      var col = i % 3, row = Math.floor(i / 3);
-      var x = 0.6 + col * 4.15, y = 1.5 + row * 2.55;
-      s2.addShape(pptx.ShapeType.roundRect, { x: x, y: y, w: 3.85, h: 2.2, fill: { color: CARD }, line: { type: 'none' }, rectRadius: 0.12 });
-      s2.addShape(pptx.ShapeType.rect, { x: x, y: y, w: 0.13, h: 2.2, fill: { color: AC }, line: { type: 'none' } });
-      s2.addText(String(k.label).toUpperCase(), { x: x + 0.3, y: y + 0.22, w: 3.4, fontSize: 11, color: MUTED, bold: true, charSpacing: 1 });
-      s2.addText(k.formatted, { x: x + 0.3, y: y + 0.62, w: 3.4, h: 0.9, fontSize: 30, bold: true, color: AC, valign: 'middle' });
-      if (k.delta != null) s2.addText((k.delta >= 0 ? '▲ ' : '▼ ') + VIS.engine.fmtSigned(k.delta) + '  vs prev', { x: x + 0.3, y: y + 1.6, w: 3.4, fontSize: 12, color: k.delta >= 0 ? '16A34A' : 'DC2626', bold: true });
-    });
-    footer(s2);
-
-    // ---- Chart slides (native / editable) ----
-    var native = 0;
-    a.charts.forEach(function (spec) {
-      var m = pptMapChart(pptx, spec);
-      if (!m) return;
-      var s = pptx.addSlide(); s.background = { color: WHITE };
-      band(s, spec.title);
-      var opts = Object.assign({}, m.opts, { x: 0.6, y: 1.3, w: 12.1, h: 5.4, chartColors: pptPalette() });
-      try { s.addChart(m.type, m.data, opts); native++; footer(s); } catch (e) { console.warn('[VIS pptx]', spec.kind, e); }
-    });
-
-    // ---- Executive summary (accent side panel) ----
-    var s4 = pptx.addSlide(); s4.background = { color: WHITE };
-    s4.addShape(pptx.ShapeType.rect, { x: 0, y: 0, w: 4.3, h: 7.5, fill: { color: AC }, line: { type: 'none' } });
-    s4.addShape(pptx.ShapeType.rect, { x: 4.3, y: 0, w: 0.08, h: 7.5, fill: { color: AC2 }, line: { type: 'none' } });
-    s4.addText('EXECUTIVE\nSUMMARY', { x: 0.5, y: 0.8, w: 3.4, fontSize: 28, bold: true, color: WHITE, charSpacing: 1, lineSpacingMultiple: 1.05 });
-    if (a.aiEnhanced) s4.addText('AI-generated', { x: 0.5, y: 2.6, w: 3.4, fontSize: 12, color: WHITE, transparency: 25, bold: true });
-    s4.addText((a.summary || '').replace(/<[^>]+>/g, ''), { x: 4.8, y: 0.8, w: 7.9, h: 5.6, fontSize: 16, color: INK, lineSpacingMultiple: 1.35, valign: 'top' });
-    footer(s4);
-
-    // ---- Recommendations (numbered) ----
-    if (a.recommendations && a.recommendations.length) {
-      var s5 = pptx.addSlide(); s5.background = { color: WHITE };
-      band(s5, 'Recommendations');
-      a.recommendations.slice(0, 6).forEach(function (r, i) {
-        var y = 1.5 + i * 0.95;
-        s5.addShape(pptx.ShapeType.ellipse, { x: 0.7, y: y, w: 0.55, h: 0.55, fill: { color: AC }, line: { type: 'none' } });
-        s5.addText(String(i + 1), { x: 0.7, y: y, w: 0.55, h: 0.55, fontSize: 16, bold: true, color: WHITE, align: 'center', valign: 'middle' });
-        s5.addText(String(r), { x: 1.5, y: y - 0.05, w: 11, h: 0.7, fontSize: 15, color: INK, valign: 'middle' });
-      });
-      footer(s5);
-    }
-
-    // ---- Key findings ----
-    if (a.insights && a.insights.length) {
-      var s6 = pptx.addSlide(); s6.background = { color: WHITE };
-      band(s6, 'Key Findings');
-      a.insights.slice(0, 5).forEach(function (ins, i) {
-        var y = 1.5 + i * 1.05;
-        var col = ins.type === 'pos' ? '16A34A' : ins.type === 'neg' ? 'DC2626' : ins.type === 'warn' ? 'D97706' : AC;
-        s6.addShape(pptx.ShapeType.roundRect, { x: 0.7, y: y, w: 0.22, h: 0.7, fill: { color: col }, line: { type: 'none' }, rectRadius: 0.1 });
-        s6.addText(String(ins.text).replace(/<[^>]+>/g, ''), { x: 1.15, y: y, w: 11.3, h: 0.7, fontSize: 14, color: INK, valign: 'middle' });
-      });
-      footer(s6);
-    }
-
-    // ---- Closing ----
-    var sc = pptx.addSlide(); sc.background = { color: AC };
-    sc.addText('Thank you', { x: 0.9, y: 2.9, w: 11, fontSize: 46, bold: true, color: WHITE });
-    sc.addText('Generated by VIS · Visual Intelligence Studio · Created by Keovoin', { x: 0.9, y: 4.2, w: 11, fontSize: 14, color: WHITE, transparency: 20 });
-
-    pptx.writeFile({ fileName: filename('pptx') }).then(function () {
-      toast('PowerPoint downloaded' + (native ? ' · ' + native + ' editable charts' : ''));
+    var deck = VIS.slides.design(state.analysis);
+    VIS.slides.compilePPTX(deck, pptx);
+    var title = (document.getElementById('dashTitle').value || state.analysis.title || 'vis-dashboard').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+    pptx.writeFile({ fileName: title + '-' + new Date().toISOString().slice(0, 10) + '.pptx' }).then(function () {
+      toast('PowerPoint downloaded · ' + deck.slides.length + ' slides');
     }).catch(function (e) { console.error(e); toast('PowerPoint export failed'); });
   }
   function escHtml(s) { return String(s).replace(/[&<>]/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;' }[c]; }); }
