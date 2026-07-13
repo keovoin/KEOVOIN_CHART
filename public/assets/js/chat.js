@@ -184,7 +184,7 @@
       { role: 'system', content: 'You are a concise executive data analyst. Answer in 1-3 short sentences using ONLY the provided figures. No markdown.' },
       { role: 'user', content: 'Data context:\n' + ctx.join('\n') + '\n\nQuestion: ' + question }
     ];
-    return VIS.ai.complete(messages, { temperature: 0.3, max_tokens: 300 })
+    return VIS.ai.complete(messages, { temperature: 0.3, max_tokens: 900 })
       .then(function (c) { return c ? String(c).trim() : null; });
   }
 

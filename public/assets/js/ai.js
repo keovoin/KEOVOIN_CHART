@@ -103,7 +103,7 @@
       { role: 'system', content: 'You are a precise executive analyst that outputs only valid JSON.' },
       { role: 'user', content: buildPrompt(analysis) }
     ];
-    return complete(messages, { temperature: 0.4, max_tokens: 700 }).then(function (content) {
+    return complete(messages, { temperature: 0.4, max_tokens: 2000 }).then(function (content) {
       return content ? parseModelJSON(content) : null;
     });
   }
