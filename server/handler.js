@@ -25,7 +25,7 @@ const CONFIG_PATH = path.join(__dirname, 'config.json');
 const EXAMPLE_PATH = path.join(__dirname, 'config.example.json');
 
 // Build marker — lets you confirm which version a deployment is actually serving.
-const BUILD = 'v15 · 2026-07-12';
+const BUILD = 'v16 · 2026-07-12';
 
 // Serverless platforms (e.g. Vercel) have a read-only filesystem.
 let PERSISTENT = !process.env.VERCEL && !process.env.AWS_LAMBDA_FUNCTION_NAME;
@@ -176,44 +176,50 @@ const MIME = {
 };
 
 /* ----------------------------- AI proxy ----------------------------- */
-function aiProxy(req, res, body) {
-  if (!config.ai.enabled || !config.ai.endpoint || !config.ai.apiKey) {
-    return sendJSON(res, 503, { error: 'AI is not configured. An admin can set it up in the admin portal (or via environment variables on serverless hosts).' });
-  }
-  if (!body || !Array.isArray(body.messages)) return sendJSON(res, 400, { error: 'messages[] required' });
-
-  let endpoint = String(config.ai.endpoint || '').trim();
-  if (/\/(chat\/completions|completions|responses)\b/.test(endpoint)) {
-    // full path already provided — use as-is
-  } else if (/\/v\d+\/?$/.test(endpoint)) {
-    endpoint = endpoint.replace(/\/+$/, '') + '/chat/completions';   // ".../v1" -> avoid double /v1
-  } else {
-    endpoint = endpoint.replace(/\/+$/, '') + '/v1/chat/completions';
-  }
-  let target;
-  try { target = new URL(endpoint); } catch (e) { return sendJSON(res, 500, { error: 'Invalid endpoint configured' }); }
-
-  const payload = JSON.stringify({
+function resolveEndpoint() {
+  var endpoint = String(config.ai.endpoint || '').trim();
+  if (/\/(chat\/completions|completions|responses)\b/.test(endpoint)) return endpoint; // full path
+  if (/\/v\d+\/?$/.test(endpoint)) return endpoint.replace(/\/+$/, '') + '/chat/completions'; // ".../v1"
+  return endpoint.replace(/\/+$/, '') + '/v1/chat/completions';
+}
+// Makes the provider call and returns raw details via cb(err, {status, contentType, raw, url}).
+function providerCall(body, cb) {
+  var endpoint = resolveEndpoint();
+  var target;
+  try { target = new URL(endpoint); } catch (e) { return cb({ error: 'Invalid endpoint configured', url: endpoint }); }
+  var payload = JSON.stringify({
     model: body.model || config.ai.model || 'gpt-4o-mini',
     messages: body.messages,
     temperature: typeof body.temperature === 'number' ? body.temperature : 0.4,
     max_tokens: body.max_tokens || 700
   });
-  const lib = target.protocol === 'http:' ? http : https;
-  const opts = {
+  var lib = target.protocol === 'http:' ? http : https;
+  var opts = {
     method: 'POST', hostname: target.hostname, port: target.port || (target.protocol === 'http:' ? 80 : 443),
     path: target.pathname + target.search,
-    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), 'Authorization': 'Bearer ' + config.ai.apiKey },
+    // send both Bearer and api-key so OpenAI-compatible AND Azure-style gateways work
+    headers: { 'Content-Type': 'application/json', 'Content-Length': Buffer.byteLength(payload), 'Authorization': 'Bearer ' + config.ai.apiKey, 'api-key': config.ai.apiKey },
     timeout: 30000
   };
-  const preq = lib.request(opts, (pres) => {
-    let data = '';
-    pres.on('data', c => data += c);
-    pres.on('end', () => { res.writeHead(pres.statusCode || 502, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }); res.end(data || '{}'); });
+  var preq = lib.request(opts, function (pres) {
+    var data = '';
+    pres.on('data', function (c) { data += c; });
+    pres.on('end', function () { cb(null, { status: pres.statusCode || 502, contentType: pres.headers['content-type'] || '', raw: data, url: endpoint }); });
   });
-  preq.on('timeout', () => { preq.destroy(); sendJSON(res, 504, { error: 'AI provider timed out' }); });
-  preq.on('error', (e) => sendJSON(res, 502, { error: 'AI provider error: ' + e.message }));
+  preq.on('timeout', function () { preq.destroy(); cb({ error: 'AI provider timed out', url: endpoint }); });
+  preq.on('error', function (e) { cb({ error: 'AI provider error: ' + e.message, url: endpoint }); });
   preq.write(payload); preq.end();
+}
+function aiProxy(req, res, body) {
+  if (!config.ai.enabled || !config.ai.endpoint || !config.ai.apiKey) {
+    return sendJSON(res, 503, { error: 'AI is not configured. An admin can set it up in the admin portal (or via environment variables on serverless hosts).' });
+  }
+  if (!body || !Array.isArray(body.messages)) return sendJSON(res, 400, { error: 'messages[] required' });
+  providerCall(body, function (err, r) {
+    if (err) return sendJSON(res, 502, { error: err.error });
+    res.writeHead(r.status, { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' });
+    res.end(r.raw || '{}');
+  });
 }
 
 /* ----------------------------- static (Node host only) ----------------------------- */
@@ -249,6 +255,24 @@ async function handleRequest(req, res) {
       if (pathname === '/api/health' && req.method === 'GET') return sendJSON(res, 200, { ok: true, build: BUILD, uptime: process.uptime(), persistent: PERSISTENT, aiConfigured: !!(config.ai.enabled && config.ai.endpoint && config.ai.apiKey), kv: KV_ON });
       if (pathname === '/api/config' && req.method === 'GET') return sendJSON(res, 200, publicConfig());
       if (pathname === '/api/ai/proxy' && req.method === 'POST') { const body = await readBody(req); return aiProxy(req, res, body); }
+
+      // Admin diagnostic: shows the resolved URL + raw provider reply so AI issues are visible.
+      if (pathname === '/api/ai/diagnose' && req.method === 'POST') {
+        if (!isAdmin(req)) return sendJSON(res, 401, { error: 'Not authenticated' });
+        if (!config.ai.enabled || !config.ai.endpoint || !config.ai.apiKey) return sendJSON(res, 200, { ok: false, reason: 'AI not configured (set endpoint + key)' });
+        return providerCall({ messages: [{ role: 'user', content: 'Reply with the single word OK.' }], max_tokens: 5 }, function (err, r) {
+          if (err) return sendJSON(res, 200, { ok: false, url: err.url, error: err.error });
+          var parsed = null, hasChoices = false, reply = null;
+          try { parsed = JSON.parse(r.raw); } catch (e) {}
+          if (parsed && parsed.choices && parsed.choices.length) { hasChoices = true; var c = parsed.choices[0]; reply = c.message ? c.message.content : c.text; }
+          return sendJSON(res, 200, {
+            ok: hasChoices, url: r.url, status: r.status, contentType: r.contentType,
+            model: config.ai.model || '(default)', reply: reply,
+            providerError: parsed && parsed.error ? parsed.error : undefined,
+            rawSnippet: String(r.raw || '').slice(0, 400)
+          });
+        });
+      }
 
       // ----- shared team dashboards -----
       if (pathname === '/api/dashboards' && req.method === 'GET') {

@@ -87,17 +87,19 @@
     var payload = { ai: { enabled: true, endpoint: $('aiEndpoint').value.trim(), model: $('aiModel').value.trim(), apiKey: $('aiKey').value.trim() } };
     api('/api/admin/config', { method: 'POST', body: JSON.stringify(payload) }).then(function () {
       $('aiKey').value = '';
-      return api('/api/ai/proxy', { method: 'POST', body: JSON.stringify({ messages: [{ role: 'user', content: 'Reply with the single word OK.' }], max_tokens: 5 }) });
+      return api('/api/ai/diagnose', { method: 'POST', body: JSON.stringify({}) });
     }).then(function (r) {
-      console.log('[VIS Test connection] HTTP', r.status, r.body);
-      if (r.status === 200 && r.body && r.body.choices && r.body.choices.length) {
-        var ch = r.body.choices[0]; var txt = ch && (ch.message ? ch.message.content : ch.text);
-        msg($('adminMsg'), 'Connection OK — model replied: "' + String(txt || '').trim().slice(0, 48) + '"');
-      } else if (r.body && r.body.error) {
-        var e = r.body.error;
-        msg($('adminMsg'), 'AI error: ' + (typeof e === 'string' ? e : JSON.stringify(e)).slice(0, 240), 'err');
+      var b = r.body || {};
+      console.log('[VIS diagnose]', b);
+      if (b.ok) {
+        msg($('adminMsg'), 'Connection OK — model replied: "' + String(b.reply || '').trim().slice(0, 48) + '"');
+      } else if (b.error) {
+        msg($('adminMsg'), 'Failed calling ' + (b.url || '?') + ' — ' + String(b.error).slice(0, 200), 'err');
+      } else if (b.providerError) {
+        var pe = b.providerError;
+        msg($('adminMsg'), 'Provider error at ' + (b.url || '?') + ' — ' + (typeof pe === 'string' ? pe : JSON.stringify(pe)).slice(0, 220), 'err');
       } else {
-        msg($('adminMsg'), 'Reached the provider (HTTP ' + r.status + ') but the reply was not in chat-completions format. Raw: ' + JSON.stringify(r.body).slice(0, 240), 'err');
+        msg($('adminMsg'), 'Reached ' + (b.url || '?') + ' (HTTP ' + b.status + ', ' + (b.contentType || '?') + ') but no chat-completions reply. Raw: ' + String(b.rawSnippet || 'empty').slice(0, 200), 'err');
       }
       loadConfig();
     });
